@@ -5,6 +5,8 @@ import { Room, ScheduledEvent, DBUser } from '../types';
 import UpcomingEventPromo from './UpcomingEventPromo';
 import BookingModal from './BookingModal';
 import RoomRecordingsModal from './RoomRecordingsModal';
+import MonetizedBanner from './MonetizedBanner';
+import BuyPromoModal from './BuyPromoModal';
 
 interface DiscoveryViewProps {
   onJoinRoom: (room: Room) => void;
@@ -23,6 +25,8 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [selectedBookingEvent, setSelectedBookingEvent] = useState<ScheduledEvent | null>(null);
   const [recordingsRoom, setRecordingsRoom] = useState<string | null>(null);
+  const [isBuyPromoOpen, setIsBuyPromoOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -54,13 +58,10 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
       rooms = rooms.filter(r => r.sentiment === selectedSentiment);
     }
 
-    // Sort strategy: ALWAYS show Live rooms first, then secondary sort
     rooms.sort((a, b) => {
-      // Primary Sort: Live status
       if (a.isLive && !b.isLive) return -1;
       if (!a.isLive && b.isLive) return 1;
 
-      // Secondary Sort
       if (sortBy === 'popular') {
         return b.participantCount - a.participantCount;
       } else if (sortBy === 'newest') {
@@ -72,7 +73,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
     });
 
     return rooms;
-  }, [searchQuery, selectedTags, minParticipants, selectedSentiment, sortBy]);
+  }, [searchQuery, selectedTags, minParticipants, selectedSentiment, sortBy, refreshTrigger]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => 
@@ -99,6 +100,9 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 pb-24">
+      {/* Monetized Global Banner */}
+      <MonetizedBanner onBuySlot={() => setIsBuyPromoOpen(true)} />
+
       {/* Hero Promo Section */}
       {!searchQuery && selectedTags.length === 0 && (
          <UpcomingEventPromo onViewEvent={(e) => setSelectedBookingEvent(e)} />
@@ -189,7 +193,6 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
             key={room.id}
             className={`relative rounded-[48px] overflow-hidden group transition-all duration-500 shadow-sm hover:shadow-2xl hover:-translate-y-1 cursor-pointer border ${room.isLive ? 'bg-white border-transparent hover:border-indigo-100' : 'bg-slate-900 border-white/5 text-white'}`}
           >
-            {/* Poster background for Upcoming/Promo Rooms */}
             {!room.isLive && (
               <div className="absolute inset-0 z-0">
                 <img src={room.posterUrl || 'https://picsum.photos/seed/promo/800/400'} className="w-full h-full object-cover opacity-30 blur-[1px] transition-transform duration-[5000ms] group-hover:scale-110" alt="" />
@@ -228,7 +231,6 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
                       {room.participantCount.toLocaleString()}
                     </div>
                   )}
-                  {/* Recordings Play Button */}
                   <button 
                     onClick={(e) => { e.stopPropagation(); setRecordingsRoom(room.title); }}
                     className="p-3 bg-orange-100 text-orange-600 rounded-2xl hover:bg-orange-200 transition-all shadow-sm group/play"
@@ -301,6 +303,17 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
           roomTitle={recordingsRoom}
         />
       )}
+
+      <BuyPromoModal 
+        isOpen={isBuyPromoOpen}
+        onClose={() => setIsBuyPromoOpen(false)}
+        currentUser={currentUser}
+        onSuccess={() => {
+          setRefreshTrigger(t => t + 1);
+          setIsBuyPromoOpen(false);
+          alert("Ad campaign launched successfully via DPO!");
+        }}
+      />
 
       <button 
         onClick={onCreateRoomClick}

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Room, User, UserRole, DBUser } from './types';
+import { Room, User, UserRole, DBUser, ActiveCall, CallType } from './types';
 import DiscoveryView from './components/DiscoveryView';
 import LiveRoom from './components/LiveRoom';
 import UserProfile from './components/UserProfile';
@@ -13,6 +13,8 @@ import ScheduleView from './components/ScheduleView';
 import GroupsView from './components/GroupsView';
 import PublicRoomPlayer from './components/PublicRoomPlayer';
 import CreatorStudio from './components/CreatorStudio';
+import CallsView from './components/CallsView';
+import CallOverlay from './components/CallOverlay';
 import { useLocale } from './components/LocaleContext';
 import { CURRENT_USER as MOCK_CURRENT_USER, MOCK_ROOMS } from './constants';
 import { auth } from './services/firebase';
@@ -27,10 +29,11 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
+  const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isLaunchpadOpen, setIsLaunchpadOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'rooms' | 'feed' | 'files' | 'schedule' | 'groups' | 'creator'>('rooms');
+  const [activeTab, setActiveTab] = useState<'rooms' | 'feed' | 'files' | 'schedule' | 'groups' | 'creator' | 'calls'>('rooms');
   const [isPublicListenerMode, setIsPublicListenerMode] = useState(false);
   
   const [currentUser, setCurrentUser] = useState<User>(() => {
@@ -114,6 +117,20 @@ const App: React.FC = () => {
     }
   };
 
+  const handleInitiateCall = (target: User, type: CallType) => {
+    setActiveCall({
+      id: `call-${Date.now()}`,
+      type,
+      participants: [currentUser, target],
+      startTime: Date.now()
+    });
+    setSelectedUser(null); // Close profile if open to show call overlay
+  };
+
+  const handleEndCall = () => {
+    setActiveCall(null);
+  };
+
   const handleProfileUpdate = (data: Partial<User>) => {
     setCurrentUser(prev => ({ ...prev, ...data }));
   };
@@ -154,6 +171,10 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f7f3e9] flex flex-col">
+      {activeCall && (
+        <CallOverlay call={activeCall} onEndCall={handleEndCall} currentUser={currentUser} />
+      )}
+
       {activeRoom ? (
         <LiveRoom 
           room={activeRoom} 
@@ -177,11 +198,11 @@ const App: React.FC = () => {
                <div className="hidden lg:flex bg-[#f7f3e9]/50 rounded-[20px] p-1 border border-gray-100">
                  {[
                    { id: 'rooms', label: t('rooms') },
+                   { id: 'calls', label: t('calls') },
                    { id: 'schedule', label: t('schedule') },
                    { id: 'groups', label: t('groups') },
                    { id: 'feed', label: t('pulse') },
                    { id: 'creator', label: t('creator_studio'), highlight: true },
-                   { id: 'files', label: t('files') }
                  ].map((tab) => (
                    <button 
                     key={tab.id}
@@ -218,6 +239,8 @@ const App: React.FC = () => {
             <div className="animate-in fade-in duration-700">
               {activeTab === 'rooms' ? (
                 dbUser && <DiscoveryView onJoinRoom={handleJoinRoom} onCreateRoomClick={() => setIsLaunchpadOpen(true)} currentUser={dbUser} />
+              ) : activeTab === 'calls' ? (
+                <CallsView onJoinRoom={handleJoinRoom} onInitiateCall={handleInitiateCall} onUserClick={setSelectedUser} />
               ) : activeTab === 'schedule' ? (
                 dbUser && <ScheduleView currentUser={dbUser} />
               ) : activeTab === 'groups' ? (
@@ -234,14 +257,14 @@ const App: React.FC = () => {
 
           {/* Bottom Nav for Mobile */}
           <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-4 flex justify-between items-center z-40 shadow-[0_-8px_30px_rgba(0,0,0,0.05)]">
-             {['rooms', 'schedule', 'creator', 'feed'].map(t_id => (
+             {['rooms', 'calls', 'creator', 'feed'].map(t_id => (
                <button 
                 key={t_id}
                 onClick={() => setActiveTab(t_id as any)}
                 className={`p-3 rounded-2xl transition-all ${activeTab === t_id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400'}`}
                >
                   {t_id === 'rooms' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>}
-                  {t_id === 'schedule' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+                  {t_id === 'calls' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>}
                   {t_id === 'creator' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                   {t_id === 'feed' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L5 21V5a2 2 0 012-2h6a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3z" /></svg>}
                </button>
@@ -257,6 +280,7 @@ const App: React.FC = () => {
           isOpen={!!selectedUser}
           onClose={() => setSelectedUser(null)}
           onUpdateProfile={handleProfileUpdate}
+          onInitiateCall={handleInitiateCall}
           localVolume={userVolumes[selectedUser.id] ?? 1}
           onVolumeChange={handleVolumeChange}
           viewerRole={currentUser.role}

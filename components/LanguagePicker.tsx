@@ -119,8 +119,8 @@ const LanguagePicker: React.FC<LanguagePickerProps> = ({
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5c.343 3.395-1.442 6.55-4.339 8.163m3.588-8.163A18.022 18.022 0 016.412 9m0 0H2" /></svg>
                     </div>
                     <div>
-                      <p className="text-sm font-black text-gray-900 uppercase tracking-tight">Bilingual Feed</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Original + Translation</p>
+                      <p className="text-sm font-black text-gray-900 uppercase tracking-tight">Bilingual Voice</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Play Original + Translation</p>
                     </div>
                 </div>
                 <button 

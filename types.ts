@@ -38,21 +38,32 @@ export interface DBDonation {
   createdAt: number;
 }
 
-// Added missing DBFollow interface to fix storage service error
+export interface MonetizedPromo {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  targetUrl: string;
+  imageUrl: string;
+  audioUrl?: string; // New field for promotion audio
+  startDate: number;
+  durationDays: number;
+  totalPaid: number;
+  status: 'active' | 'expired';
+}
+
 export interface DBFollow {
   followerId: string;
   followedId: string;
   createdAt: number;
 }
 
-// Added missing DBLike interface to fix storage service and postcard errors
 export interface DBLike {
   userId: string;
   postId: string;
   createdAt: number;
 }
 
-// Added missing DBComment interface to fix storage service and postcard errors
 export interface DBComment {
   id: string;
   userId: string;
@@ -61,7 +72,6 @@ export interface DBComment {
   createdAt: number;
 }
 
-// Added missing DBSubscription interface to fix storage service error
 export interface DBSubscription {
   subscriberId: string;
   targetUserId: string;
@@ -182,4 +192,13 @@ export interface BackgroundAudio {
   isPlaying: boolean;
   volume: number;
   loop?: boolean;
+}
+
+// New Call Types
+export type CallType = 'voice' | 'video';
+export interface ActiveCall {
+  id: string;
+  type: CallType;
+  participants: User[];
+  startTime: number;
 }

@@ -5,6 +5,7 @@ const translations: Record<Locale, Record<string, string>> = {
   en: {
     app_name: 'VOICE SOCIAL',
     rooms: 'Rooms',
+    calls: 'Connect',
     pulse: 'Pulse',
     schedule: 'Schedule',
     groups: 'Groups',
@@ -24,6 +25,7 @@ const translations: Record<Locale, Record<string, string>> = {
   fr: {
     app_name: 'VOICE SOCIAL',
     rooms: 'Salons',
+    calls: 'Connecter',
     pulse: 'Impulsion',
     schedule: 'Calendrier',
     groups: 'Groupes',
@@ -43,6 +45,7 @@ const translations: Record<Locale, Record<string, string>> = {
   es: {
     app_name: 'VOICE SOCIAL',
     rooms: 'Salas',
+    calls: 'Conectar',
     pulse: 'Pulso',
     schedule: 'Horario',
     groups: 'Grupos',

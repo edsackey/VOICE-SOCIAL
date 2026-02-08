@@ -1,5 +1,5 @@
 
-import { DBUser, DBPost, DBFollow, DBLike, DBComment, DBSubscription, DBDonation, AttendanceRecord, EchoGroup } from '../types';
+import { DBUser, DBPost, DBFollow, DBLike, DBComment, DBSubscription, DBDonation, AttendanceRecord, EchoGroup, ScheduledEvent, MonetizedPromo } from '../types';
 
 const KEYS = {
   USERS: 'vrl_db_users',
@@ -10,7 +10,9 @@ const KEYS = {
   COMMENTS: 'vrl_db_comments',
   DONATIONS: 'vrl_db_donations',
   ATTENDANCE: 'vrl_db_attendance',
-  GROUPS: 'vrl_db_groups'
+  GROUPS: 'vrl_db_groups',
+  SCHEDULE: 'vrl_db_schedule',
+  PROMOS: 'vrl_db_monetized_promos'
 };
 
 const get = <T>(key: string): T[] => JSON.parse(localStorage.getItem(key) || '[]');
@@ -34,8 +36,6 @@ export const StorageService = {
     return roomId ? all.filter(d => d.roomId === roomId) : all;
   },
   
-  // New: Get all donations for rooms where a specific user is the sender/creator (for demo purposes)
-  // or just all donations in the system to simulate a global creator view
   getAllDonations: () => get<DBDonation>(KEYS.DONATIONS),
   
   saveDonation: (donation: DBDonation) => {
@@ -127,5 +127,21 @@ export const StorageService = {
     const comments = get<DBComment>(KEYS.COMMENTS);
     comments.push(comment);
     set(KEYS.COMMENTS, comments);
+  },
+
+  // Schedule
+  getScheduledEvents: () => get<ScheduledEvent>(KEYS.SCHEDULE),
+  saveScheduledEvent: (event: ScheduledEvent) => {
+    const events = get<ScheduledEvent>(KEYS.SCHEDULE);
+    events.push(event);
+    set(KEYS.SCHEDULE, events);
+  },
+
+  // Monetized Promos
+  getPromos: () => get<MonetizedPromo>(KEYS.PROMOS),
+  savePromo: (promo: MonetizedPromo) => {
+    const current = get<MonetizedPromo>(KEYS.PROMOS);
+    current.push(promo);
+    set(KEYS.PROMOS, current);
   }
 };

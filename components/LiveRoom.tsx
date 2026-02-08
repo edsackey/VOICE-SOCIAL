@@ -158,16 +158,21 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
+    
+    // Gapless queueing
     const startTime = Math.max(nextStartTimeRef.current, ctx.currentTime);
     source.start(startTime);
     nextStartTimeRef.current = startTime + buffer.duration;
-    const startOffset = (startTime - ctx.currentTime) * 1000;
-    setTimeout(() => {
-      setTranscriptions(prev => prev.map((t, idx) => idx === entryId ? { ...t, isReading: true } : t));
-    }, startOffset);
-    setTimeout(() => {
-      setTranscriptions(prev => prev.map((t, idx) => idx === entryId ? { ...t, isReading: false } : t));
-    }, startOffset + (buffer.duration * 1000));
+    
+    if (entryId !== -1) {
+      const startOffset = (startTime - ctx.currentTime) * 1000;
+      setTimeout(() => {
+        setTranscriptions(prev => prev.map((t, idx) => idx === entryId ? { ...t, isReading: true } : t));
+      }, startOffset);
+      setTimeout(() => {
+        setTranscriptions(prev => prev.map((t, idx) => idx === entryId ? { ...t, isReading: false } : t));
+      }, startOffset + (buffer.duration * 1000));
+    }
   };
 
   useEffect(() => {
@@ -201,7 +206,6 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
         try {
           const translation = await translateTranscription(text, targetLanguage);
           if (translation === text) {
-            // Quota probably hit if it returned original
             setIsQuotaHit(true);
           } else {
             setIsQuotaHit(false);
@@ -209,11 +213,21 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
           newEntry.translation = translation;
           
           if (isVoiceEnabled && !isQuotaHit) {
-            const voiceData = await generateVoiceTranslation(translation, targetLanguage, selectedVoice);
-            if (voiceData) {
+            // Sequence: Original -> Translation if bilingual enabled
+            if (isBilingualEnabled) {
+              const originalAudio = await generateVoiceTranslation(text, 'English', 'Puck');
+              if (originalAudio) {
+                // Play original immediately (will be queued by nextStartTimeRef)
+                playVoiceTranslation(originalAudio, -1);
+              }
+            }
+
+            const transAudio = await generateVoiceTranslation(translation, targetLanguage, selectedVoice);
+            if (transAudio) {
               setTranscriptions(prev => {
                 const nextState = [...prev.slice(-20), newEntry];
-                playVoiceTranslation(voiceData, nextState.length - 1);
+                // Play translation (will be queued after original if applicable)
+                playVoiceTranslation(transAudio, nextState.length - 1);
                 return nextState;
               });
               return;
@@ -224,7 +238,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
         }
       }
       setTranscriptions(prev => [...prev.slice(-20), newEntry]);
-    }, 10000); // Increased interval to 10s to conserve quota
+    }, 10000); 
     return () => clearInterval(interval);
   }, [room.speakers, room.listeners, targetLanguage, isVoiceEnabled, selectedVoice, isBilingualEnabled, isQuotaHit]);
 
