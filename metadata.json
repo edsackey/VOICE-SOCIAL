@@ -1,0 +1,7 @@
+{
+  "name": "VOICE SOCIAL",
+  "description": "VOICE SOCIAL is a next-generation social audio platform featuring real-time AI transcription, smart moderation, and an interactive AI co-host powered by Google Gemini.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
