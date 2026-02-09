@@ -270,6 +270,19 @@ const UserProfile: React.FC<UserProfileProps> = ({
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 relative z-10">
+                    {user.handRaised && (
+                       <button 
+                        onClick={() => {
+                          onModerateUser(user.id, 'role', UserRole.SPEAKER);
+                          onClose();
+                        }}
+                        className="col-span-2 p-6 rounded-[32px] bg-yellow-400 text-white shadow-xl shadow-yellow-400/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-4 mb-2"
+                      >
+                        <span className="text-2xl">✋</span>
+                        <span className="text-xs font-black uppercase tracking-widest">Invite User to Speak</span>
+                      </button>
+                    )}
+
                     <button 
                       onClick={() => onModerateUser(user.id, 'mute')}
                       className={`p-5 rounded-3xl transition-all border flex flex-col items-center gap-2 ${user.isMuted ? 'bg-red-600 border-red-600 text-white' : 'bg-white border-red-100 text-red-600 hover:bg-red-50'}`}

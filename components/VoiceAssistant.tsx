@@ -37,7 +37,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Initialize context with default sample rate to match stream and avoid NotSupportedError
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = inputCtx;
@@ -53,7 +52,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
               if (!isListening) return;
               const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-              // Resample from hardware rate to 16000Hz required by the API
               const resampledData = resample(inputData, inputCtx.sampleRate, 16000);
               const pcmBlob = createBlob(resampledData);
               sessionPromise.then((session) => {
@@ -114,7 +112,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
               }
             }
           },
-          onerror: (e) => console.error("Echo Assistant Interface Error:", e),
+          onerror: (e) => console.error("Chat-Chap Interface Error:", e),
           onclose: () => setIsActive(false),
         },
         config: {
@@ -123,8 +121,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } },
           },
           tools: [{ functionDeclarations: appControlTools }],
-          systemInstruction: `You are the Echo Assistant for EchoHub, a premium social audio platform.
-            Your role is to act as a bilingual concierge and voice navigator.
+          systemInstruction: `You are the Chat-Chap Assistant, a premium social audio concierge.
+            Your role is to act as a bilingual guide and voice navigator.
             
             NAVIGATION:
             - "hallway" or "discovery" maps to 'rooms'.
@@ -134,7 +132,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             
             TONE:
             - Current Locale: ${locale.toUpperCase()}.
-            - Professional, sleek, and high-fidelity.
+            - Professional, sleek, and helpful.
             - Bilingual Mode is ${isBilingual ? 'ON - provide translations where helpful.' : 'OFF'}.
             - Keep responses concise for audio delivery.`,
           inputAudioTranscription: {},
@@ -143,7 +141,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
 
       sessionPromiseRef.current = sessionPromise;
     } catch (err) {
-      console.error("Failure in Echo Assistant Initialization:", err);
+      console.error("Assistant Hub Sync Error:", err);
       setIsActive(false);
     }
   };
@@ -169,7 +167,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             <div className="flex items-center gap-2 mb-1.5">
                <div className={`w-2 h-2 rounded-full ${isAbenaTalking ? 'bg-green-500 animate-pulse' : 'bg-accent animate-pulse shadow-[0_0_8px_var(--accent)]'}`} />
                <p className="text-[10px] font-black text-accent uppercase tracking-widest italic">
-                Echo Assistant ({selectedVoice})
+                Chat-Chap Assistant ({selectedVoice})
                </p>
             </div>
             <p className="text-sm font-bold text-[var(--text-main)] italic leading-tight">

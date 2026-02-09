@@ -29,14 +29,14 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
   };
 
   const downloadMinutes = (podcast: PodcastRecord) => {
-    const filename = `VOICE_SOCIAL_Minutes_${podcast.title.replace(/\s+/g, '_')}_${podcast.date.replace(/\//g, '-')}.txt`;
+    const filename = `Chat-Chap_Minutes_${podcast.title.replace(/\s+/g, '_')}_${podcast.date.replace(/\//g, '-')}.txt`;
     downloadFile(podcast.minutes, filename);
   };
 
   const downloadAllData = () => {
     if (podcasts.length === 0) return;
     
-    let consolidated = "VOICE SOCIAL GLOBAL ARCHIVE - CONSOLIDATED REPORT\n";
+    let consolidated = "CHAT-CHAP GLOBAL ARCHIVE - CONSOLIDATED REPORT\n";
     consolidated += "================================================\n\n";
     
     podcasts.forEach((p, idx) => {
@@ -48,7 +48,7 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
       consolidated += "************************************************\n\n";
     });
 
-    downloadFile(consolidated, `VOICE_SOCIAL_Vault_Export_${new Date().toISOString().split('T')[0]}.txt`);
+    downloadFile(consolidated, `Chat-Chap_Vault_Export_${new Date().toISOString().split('T')[0]}.txt`);
   };
 
   if (!isOpen) return null;
@@ -65,8 +65,8 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
              </div>
              <div>
-               <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">VOICE SOCIAL Vault</h2>
-               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Podcasts & AI Session Minutes</p>
+               <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Chat-Chap Vault</h2>
+               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Podcasts & AI Session Summary</p>
              </div>
           </div>
           <div className="flex items-center gap-3">
@@ -76,7 +76,7 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
                   className="bg-indigo-50 text-indigo-600 px-5 py-2.5 rounded-full font-black uppercase text-[10px] tracking-widest hover:bg-indigo-100 transition-all flex items-center gap-2 border border-indigo-100"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  Export All
+                  Consolidated Export
                 </button>
              )}
              <button onClick={onClose} className="p-3 bg-gray-50 rounded-full text-gray-400 hover:text-gray-600 transition-all border border-gray-100">
@@ -89,26 +89,26 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
           {podcasts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full opacity-20 text-center space-y-4">
                <svg className="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-               <p className="text-sm font-black uppercase tracking-[0.3em]">Vault is empty</p>
+               <p className="text-sm font-black uppercase tracking-[0.3em]">No records found</p>
             </div>
           ) : selectedPodcast ? (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                <button onClick={() => setSelectedPodcast(null)} className="mb-8 flex items-center gap-2 text-[10px] font-black uppercase text-indigo-600 tracking-widest hover:underline">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-                  Back to List
+                  Back to Hub
                </button>
                <div className="bg-white p-10 rounded-[56px] shadow-sm border border-gray-100 mb-10">
                   <div className="flex justify-between items-start mb-8">
                      <div>
                         <h3 className="text-3xl font-black text-gray-900 mb-2">{selectedPodcast.title}</h3>
-                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{selectedPodcast.date} • Recorded Live</p>
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{selectedPodcast.date} • Session Captured</p>
                      </div>
                      <button 
                         onClick={() => downloadMinutes(selectedPodcast)}
                         className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
                      >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        Download PDF/Text
+                        Download Transcription
                      </button>
                   </div>
                   <div className="prose prose-indigo max-w-none">
@@ -128,7 +128,7 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
                 >
                    <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">AI Podcast Archive</span>
+                        <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Capture Node</span>
                         <span className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">{podcast.date}</span>
                       </div>
                       <h3 className="text-xl font-black text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">{podcast.title}</h3>
@@ -143,7 +143,7 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
                       <button 
                         onClick={() => downloadMinutes(podcast)}
                         className="p-5 bg-white text-indigo-600 rounded-[24px] border-2 border-indigo-50 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                        title="Download Minutes"
+                        title="Download Log"
                       >
                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                       </button>
@@ -151,7 +151,7 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
                         onClick={() => setSelectedPodcast(podcast)}
                         className="px-8 py-5 bg-indigo-600 text-white rounded-[24px] font-black uppercase tracking-widest text-[10px] shadow-xl shadow-indigo-100 hover:scale-105 active:scale-95 transition-all"
                       >
-                         View Insights
+                         Analysis Hub
                       </button>
                    </div>
                 </div>
@@ -161,7 +161,7 @@ const PodcastArchive: React.FC<PodcastArchiveProps> = ({ isOpen, onClose }) => {
         </div>
 
         <div className="p-8 bg-white border-t border-gray-100 flex justify-center shrink-0">
-           <p className="text-[9px] text-gray-300 font-black uppercase tracking-[0.4em]">VOICE SOCIAL Digital Archive • End-to-End Encrypted Storage</p>
+           <p className="text-[9px] text-gray-300 font-black uppercase tracking-[0.4em]">Chat-Chap Neural Archive • Industrial Grade Security</p>
         </div>
       </div>
     </div>

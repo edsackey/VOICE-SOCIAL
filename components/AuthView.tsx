@@ -21,17 +21,17 @@ type AuthMode = 'login' | 'register' | 'verify';
 const FEATURES = [
   {
     image: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&q=80&w=1200",
-    title: "EchoHub Live",
+    title: "Chat-Chap Live",
     desc: "Broadcast your essence, find your frequency."
   },
   {
     image: "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=1200",
-    title: "Neural Echo",
-    desc: "Bilingual translation echoing across the globe."
+    title: "Bilingual Pulse",
+    desc: "Simultaneous translation echoing across the globe."
   },
   {
     image: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&q=80&w=1200",
-    title: "The Vault",
+    title: "Neural Archive",
     desc: "Every word archived and summarized by AI."
   }
 ];
@@ -135,8 +135,8 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthenticated }) => {
           <div className="w-16 h-16 bg-[var(--accent)] text-white rounded-2xl flex items-center justify-center mx-auto shadow-2xl mb-4">
              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
           </div>
-          <h1 className="text-4xl font-black tracking-tighter text-[var(--accent)] uppercase italic">EchoHub</h1>
-          <p className="text-[var(--text-muted)] text-sm font-bold uppercase tracking-widest mt-1">Universal Voice Network</p>
+          <h1 className="text-4xl font-black tracking-tighter text-[var(--accent)] uppercase italic">CHAT-CHAP</h1>
+          <p className="text-[var(--text-muted)] text-sm font-bold uppercase tracking-widest mt-1">Unified Voice Network</p>
         </div>
 
         <div className="bg-[var(--bg-secondary)] rounded-[24px] shadow-2xl p-8 border border-[var(--glass-border)]">
@@ -146,7 +146,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthenticated }) => {
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                </div>
                <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">Check your email</h3>
-               <p className="text-[var(--text-muted)] text-sm mb-8 leading-relaxed">We sent a verification link to your email address. Verify your account to sign in to EchoHub.</p>
+               <p className="text-[var(--text-muted)] text-sm mb-8 leading-relaxed">We sent a verification link to your email address. Verify your account to sign in to Chat-Chap.</p>
                <button onClick={() => setMode('login')} className="w-full bg-[var(--accent)] text-white py-4 rounded-xl font-bold hover:bg-[var(--accent-hover)] transition-all active:scale-95">Back to Sign In</button>
             </div>
           ) : (
@@ -156,13 +156,13 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthenticated }) => {
                 {mode === 'register' && (
                   <div className="space-y-4">
                     <input type="text" required value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Full Name" className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all" />
-                    <input type="text" required value={username} onChange={e => setUsername(e.target.value)} placeholder="Nexus ID (Username)" className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all" />
+                    <input type="text" required value={username} onChange={e => setUsername(e.target.value)} placeholder="Chat-Chap ID (Username)" className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all" />
                   </div>
                 )}
                 <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Email Address" className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all" />
                 <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Secure Password" className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all" />
                 <button type="submit" disabled={loading} className="w-full bg-[var(--accent)] text-white py-4 rounded-xl font-black uppercase text-sm shadow-xl hover:bg-[var(--accent-hover)] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
-                  {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : (mode === 'login' ? 'Enter Hub' : 'Create Identity')}
+                  {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : (mode === 'login' ? 'Enter Hub' : 'Join Network')}
                 </button>
               </form>
               <div className="relative flex items-center py-2"><div className="flex-grow border-t border-[var(--glass-border)]"></div><span className="flex-shrink mx-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">or</span><div className="flex-grow border-t border-[var(--glass-border)]"></div></div>
@@ -171,13 +171,13 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthenticated }) => {
               </button>
               <div className="text-center pt-4">
                  <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="text-sm font-bold text-[var(--accent)] hover:underline">
-                   {mode === 'login' ? "New to EchoHub? Create account" : "Already have an account? Sign in"}
+                   {mode === 'login' ? "New to Chat-Chap? Join now" : "Already have an account? Sign in"}
                  </button>
               </div>
             </div>
           )}
         </div>
-        <p className="mt-12 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest text-center opacity-40">EchoHub Neural Protocol • v6.1 Global</p>
+        <p className="mt-12 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest text-center opacity-40">Neural Node Protocol • v7.0 Global</p>
       </div>
     </div>
   );
