@@ -1,6 +1,6 @@
 {
-  "name": "Chat-Chap",
-  "description": "Chat-Chap is a premier social audio platform with a Facebook-inspired aesthetic, featuring real-time AI transcription and a bilingual AI co-host.",
+  "name": "EchoHub",
+  "description": "EchoHub is a premium social audio platform featuring real-time neural transcription, bilingual AI echoing, and high-fidelity live stages.",
   "requestFramePermissions": [
     "microphone",
     "camera"

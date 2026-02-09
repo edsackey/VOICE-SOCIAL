@@ -24,12 +24,12 @@ import { auth } from './services/firebase';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { StorageService } from './services/storageService';
 
-const PROFILE_STORAGE_KEY = 'chat_chap_profile_data';
-const THEME_STORAGE_KEY = 'chat_chap_theme_pref';
+const PROFILE_STORAGE_KEY = 'echohub_profile_data';
+const THEME_STORAGE_KEY = 'echohub_theme_pref';
 const THEMES: AppTheme[] = ['midnight', 'light', 'blue', 'sunset'];
 
 const App: React.FC = () => {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
@@ -45,7 +45,6 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<EchoNotification[]>([]);
   const [currentToast, setCurrentToast] = useState<EchoNotification | null>(null);
 
-  // Per-user volume state
   const [userVolumes, setUserVolumes] = useState<Record<string, number>>({});
 
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -81,34 +80,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshNotifications();
-    
-    // Listen for custom real-time notification events
     const handleNewNotif = (e: any) => {
       const notif = e.detail;
       setCurrentToast(notif);
       refreshNotifications();
     };
-    
     window.addEventListener('echo_new_notification', handleNewNotif);
     return () => window.removeEventListener('echo_new_notification', handleNewNotif);
   }, []);
-
-  // Simulation: Occasionally trigger a "Follower started a room" notification
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const triggerSim = setTimeout(() => {
-      StorageService.saveNotification({
-        id: `sim-${Date.now()}`,
-        type: 'ROOM_START',
-        title: 'Sarah Chen is Live',
-        message: 'Join "Creative Coding with Gemini" starting now!',
-        timestamp: Date.now(),
-        isRead: false,
-        senderAvatar: 'https://picsum.photos/seed/u2/200'
-      });
-    }, 15000);
-    return () => clearTimeout(triggerSim);
-  }, [isAuthenticated]);
 
   const toggleTheme = () => {
     const nextIndex = (THEMES.indexOf(theme) + 1) % THEMES.length;
@@ -121,31 +100,14 @@ const App: React.FC = () => {
 
   const handleModerateUser = (userId: string, action: 'mute' | 'kick' | 'role', value?: any) => {
     if (!activeRoom) return;
-
     let updatedRoom = { ...activeRoom };
-
     if (action === 'kick') {
       updatedRoom.speakers = updatedRoom.speakers.filter(s => s.id !== userId);
       updatedRoom.listeners = updatedRoom.listeners.filter(l => l.id !== userId);
       if (selectedUser?.id === userId) setSelectedUser(null);
-      alert("Participant expelled from stage.");
     } else if (action === 'mute') {
       updatedRoom.speakers = updatedRoom.speakers.map(s => s.id === userId ? { ...s, isMuted: !s.isMuted } : s);
-      updatedRoom.listeners = updatedRoom.listeners.map(l => l.id === userId ? { ...l, isMuted: true } : l);
-      if (selectedUser?.id === userId) setSelectedUser(prev => prev ? { ...prev, isMuted: !prev.isMuted } : null);
-    } else if (action === 'role') {
-      const newRole = value as UserRole;
-      let targetUser = updatedRoom.speakers.find(s => s.id === userId) || updatedRoom.listeners.find(l => l.id === userId);
-      if (targetUser) {
-        targetUser = { ...targetUser, role: newRole };
-        updatedRoom.speakers = updatedRoom.speakers.filter(s => s.id !== userId);
-        updatedRoom.listeners = updatedRoom.listeners.filter(l => l.id !== userId);
-        if (newRole === UserRole.LISTENER) updatedRoom.listeners.push(targetUser);
-        else updatedRoom.speakers.push(targetUser);
-        if (selectedUser?.id === userId) setSelectedUser(targetUser);
-      }
     }
-
     setActiveRoom(updatedRoom);
   };
 
@@ -155,7 +117,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-main flex flex-col items-center justify-center">
         <div className="w-12 h-12 border-4 border-accent/20 border-t-accent rounded-full animate-spin mb-4" />
-        <p className="text-[10px] font-black text-accent uppercase tracking-[0.5em] animate-pulse">Chat-Chap Voice Engine</p>
+        <p className="text-[10px] font-black text-accent uppercase tracking-[0.5em] animate-pulse">EchoHub Neural Engine</p>
       </div>
     );
   }
@@ -169,7 +131,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-main text-main selection:bg-accent selection:text-white transition-colors duration-500">
       <VoiceAssistant onNavigate={setActiveTab} onMuteToggle={() => {}} />
-      
       <NotificationToast notification={currentToast} onClose={() => setCurrentToast(null)} />
 
       {activeCall && <CallOverlay call={activeCall} onEndCall={() => setActiveCall(null)} currentUser={currentUser} />}
@@ -191,36 +152,19 @@ const App: React.FC = () => {
                 <div className="w-10 h-10 bg-accent rounded-2xl flex items-center justify-center shadow-lg shadow-accent/20 rotate-3">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
                 </div>
-                <span className="text-xl font-black tracking-tighter uppercase italic">Chat-Chap</span>
+                <span className="text-xl font-black tracking-tighter uppercase italic">{t('app_name')}</span>
               </div>
               
               <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => setIsNotificationsOpen(true)}
-                  className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all relative"
-                >
+                <button onClick={() => setIsNotificationsOpen(true)} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all relative">
                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                   {unreadCount > 0 && (
-                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-black border-2 border-secondary shadow-lg animate-pulse">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                     </span>
-                   )}
+                   {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-black border-2 border-secondary shadow-lg animate-pulse">{unreadCount}</span>}
                 </button>
-                <button 
-                  onClick={() => setIsLangPickerOpen(true)}
-                  className="px-4 py-2 bg-accent/10 rounded-2xl border border-accent/20 text-accent font-black text-[10px] uppercase tracking-widest hover:bg-accent hover:text-white transition-all hidden sm:block"
-                >
-                  Native: {locale.toUpperCase()}
+                <button onClick={() => setIsLangPickerOpen(true)} className="px-4 py-2 bg-accent/10 rounded-2xl border border-accent/20 text-accent font-black text-[10px] uppercase tracking-widest hover:bg-accent hover:text-white transition-all hidden sm:block">
+                  {t('native_lang')}: {locale.toUpperCase()}
                 </button>
-                <button 
-                  onClick={toggleTheme}
-                  className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all flex items-center gap-2"
-                  title="Switch Theme"
-                >
-                  {theme === 'midnight' && <span className="text-lg">🌙</span>}
-                  {theme === 'light' && <span className="text-lg">☀️</span>}
-                  {theme === 'blue' && <span className="text-lg">🌊</span>}
-                  {theme === 'sunset' && <span className="text-lg">🌅</span>}
+                <button onClick={toggleTheme} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all flex items-center gap-2">
+                  {theme === 'midnight' ? '🌙' : '☀️'}
                 </button>
                 <button onClick={() => setIsArchiveOpen(true)} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
@@ -278,12 +222,7 @@ const App: React.FC = () => {
       <ViralLaunchpad isOpen={isLaunchpadOpen} onClose={() => setIsLaunchpadOpen(false)} onLaunch={(r) => { setActiveRoom(r); setIsLaunchpadOpen(false); }} />
       <PodcastArchive isOpen={isArchiveOpen} onClose={() => setIsArchiveOpen(false)} />
       <LanguagePicker isOpen={isLangPickerOpen} onClose={() => setIsLangPickerOpen(false)} />
-      <NotificationsPanel 
-        isOpen={isNotificationsOpen} 
-        onClose={() => setIsNotificationsOpen(false)} 
-        notifications={notifications} 
-        onRefresh={refreshNotifications}
-      />
+      <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} notifications={notifications} onRefresh={refreshNotifications} />
     </div>
   );
 };

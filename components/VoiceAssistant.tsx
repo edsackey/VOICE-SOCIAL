@@ -91,15 +91,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
               for (const fc of message.toolCall.functionCalls) {
                 let result = "ok";
                 if (fc.name === 'navigate_to') {
-                  // Fix for type error on line 94: cast fc.args to expected type
                   const args = fc.args as { tab?: string };
                   const target = (args.tab || '').toLowerCase();
-                  // Normalize tab names from voice input
-                  if (target.includes('room') || target.includes('discover')) onNavigate('rooms');
+                  if (target.includes('room') || target.includes('discover') || target.includes('hallway')) onNavigate('rooms');
                   else if (target.includes('feed') || target.includes('pulse')) onNavigate('feed');
                   else if (target.includes('schedule') || target.includes('timeline')) onNavigate('schedule');
                   else if (target.includes('group') || target.includes('tribe')) onNavigate('groups');
-                  else if (target.includes('creator') || target.includes('studio')) onNavigate('creator');
+                  else if (target.includes('creator') || target.includes('hub')) onNavigate('creator');
                   else if (target.includes('call') || target.includes('connect')) onNavigate('calls');
                 } else if (fc.name === 'toggle_mute') {
                   onMuteToggle();
@@ -113,7 +111,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
               }
             }
           },
-          onerror: (e) => console.error("Abena Neural Interface Error:", e),
+          onerror: (e) => console.error("Echo Assistant Interface Error:", e),
           onclose: () => setIsActive(false),
         },
         config: {
@@ -122,29 +120,27 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } },
           },
           tools: [{ functionDeclarations: appControlTools }],
-          systemInstruction: `You are Abena AI, the premier voice navigator for the Chat-Chap platform.
-            Your primary function is to guide users through the app via voice navigation and act as a bilingual assistant.
+          systemInstruction: `You are the Echo Assistant for EchoHub, a premium social audio platform.
+            Your role is to act as a bilingual concierge and voice navigator.
             
-            NAVIGATION GUIDELINES:
-            - If the user wants to see live audio sessions or discovery, call 'navigate_to' with "rooms".
-            - If they want to see social posts or the Pulse, use "feed".
-            - If they want to view the timeline or scheduled events, use "schedule".
-            - If they want to join tribes or groups, use "groups".
-            - If they want to see financial data or creator tools, use "creator".
-            - If they want to see their direct network or call someone, use "calls".
+            NAVIGATION:
+            - "hallway" or "discovery" maps to 'rooms'.
+            - "tribes" maps to 'groups'.
+            - "the pulse" maps to 'feed'.
+            - "the vault" maps to 'creator'.
             
-            CONVERSATIONAL TONE:
+            TONE:
             - Current Locale: ${locale.toUpperCase()}.
-            - Bilingual Mode: ${isBilingual ? 'ACTIVE. You should respond with sequential translations if helpful.' : 'INACTIVE'}.
-            - Be elegant, professional, and helpful. You are a personal concierge.
-            - Keep responses concise as they are delivered via voice.`,
+            - Professional, sleek, and high-fidelity.
+            - Bilingual Mode is ${isBilingual ? 'ON - provide translations where helpful.' : 'OFF'}.
+            - Keep responses concise for audio delivery.`,
           inputAudioTranscription: {},
         }
       });
 
       sessionPromiseRef.current = sessionPromise;
     } catch (err) {
-      console.error("Critical Failure in Abena Initialization:", err);
+      console.error("Failure in Echo Assistant Initialization:", err);
       setIsActive(false);
     }
   };
@@ -170,23 +166,18 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             <div className="flex items-center gap-2 mb-1.5">
                <div className={`w-2 h-2 rounded-full ${isAbenaTalking ? 'bg-green-500 animate-pulse' : 'bg-accent animate-pulse shadow-[0_0_8px_var(--accent)]'}`} />
                <p className="text-[10px] font-black text-accent uppercase tracking-widest italic">
-                Abena AI ({selectedVoice})
+                Echo Assistant ({selectedVoice})
                </p>
             </div>
             <p className="text-sm font-bold text-[var(--text-main)] italic leading-tight">
-              {isAbenaTalking ? 'Processing request...' : lastTranscribed ? `"${lastTranscribed}"` : 'Listening...'}
+              {isAbenaTalking ? 'Processing...' : lastTranscribed ? `"${lastTranscribed}"` : 'Listening...'}
             </p>
          </div>
        )}
        
-       <button 
-        onClick={toggleListening}
-        className={`pointer-events-auto p-6 rounded-[28px] shadow-[0_24px_48px_rgba(0,0,0,0.2)] transition-all active:scale-90 group relative overflow-hidden ${isListening ? 'bg-accent text-white scale-110 shadow-[0_0_40px_var(--accent-glow)]' : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-accent border border-[var(--glass-border)]'}`}
-       >
+       <button onClick={toggleListening} className={`pointer-events-auto p-6 rounded-[28px] shadow-[0_24px_48px_rgba(0,0,0,0.2)] transition-all active:scale-90 group relative overflow-hidden ${isListening ? 'bg-accent text-white scale-110 shadow-[0_0_40px_var(--accent-glow)]' : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-accent border border-[var(--glass-border)]'}`}>
          <div className="relative z-10">
-           <svg className={`w-8 h-8 ${isAbenaTalking ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-           </svg>
+           <svg className={`w-8 h-8 ${isAbenaTalking ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
          </div>
          {isListening && <div className="absolute inset-0 bg-white/20 animate-pulse" />}
        </button>
