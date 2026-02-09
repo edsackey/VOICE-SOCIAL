@@ -8,9 +8,10 @@ import { decode, decodeAudioData, createBlob, resample } from '../services/audio
 interface VoiceAssistantProps {
   onNavigate: (tab: any) => void;
   onMuteToggle: () => void;
+  onOpenCreationPortal?: () => void;
 }
 
-const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggle }) => {
+const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggle, onOpenCreationPortal }) => {
   const { locale, selectedVoice, isBilingual } = useLocale();
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -102,6 +103,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
                   else if (target.includes('call') || target.includes('connect')) onNavigate('calls');
                 } else if (fc.name === 'toggle_mute') {
                   onMuteToggle();
+                } else if (fc.name === 'launch_creation_portal') {
+                  onOpenCreationPortal?.();
                 }
                 
                 sessionPromise.then(session => {
@@ -129,6 +132,9 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             - "tribes" maps to 'groups'.
             - "the pulse" maps to 'feed'.
             - "the vault" maps to 'creator'.
+            
+            CREATION:
+            - If a user wants to "start a room", "launch a hub", "open the portal", or "create a stage", call 'launch_creation_portal'.
             
             TONE:
             - Current Locale: ${locale.toUpperCase()}.

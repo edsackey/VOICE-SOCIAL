@@ -188,10 +188,13 @@ export const StorageService = {
   },
 
   // Podcasts & Recordings
-  getPodcasts: () => get<PodcastRecord>(KEYS.PODCASTS),
+  getPodcasts: (roomId?: string) => {
+    const all = get<PodcastRecord>(KEYS.PODCASTS);
+    return roomId ? all.filter(p => p.roomId === roomId) : all;
+  },
   savePodcast: (podcast: PodcastRecord) => {
     const current = get<PodcastRecord>(KEYS.PODCASTS);
-    set(KEYS.PODCASTS, [podcast, ...current].slice(0, 20)); 
+    set(KEYS.PODCASTS, [podcast, ...current].slice(0, 100)); 
   },
 
   // Notifications

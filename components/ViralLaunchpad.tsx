@@ -1,17 +1,19 @@
+
 import React, { useState, useRef } from 'react';
 import { generateRoomIdeas, generatePromoContent, generateAdPoster, generateVoiceTeaser } from '../services/geminiService';
-import { Room } from '../types';
+import { Room, User, UserRole } from '../types';
 import { StorageService } from '../services/storageService';
 
 interface ViralLaunchpadProps {
   isOpen: boolean;
   onClose: () => void;
   onLaunch: (room: Room) => void;
+  currentUser: User;
 }
 
 type Step = 'concept' | 'studio' | 'teaser' | 'distribute';
 
-const ViralLaunchpad: React.FC<ViralLaunchpadProps> = ({ isOpen, onClose, onLaunch }) => {
+const ViralLaunchpad: React.FC<ViralLaunchpadProps> = ({ isOpen, onClose, onLaunch, currentUser }) => {
   const [step, setStep] = useState<Step>('concept');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -68,7 +70,7 @@ const ViralLaunchpad: React.FC<ViralLaunchpadProps> = ({ isOpen, onClose, onLaun
   };
 
   const handleFinalLaunch = () => {
-    // Fix: Added missing required properties 'followerCount' and 'followers' for Room interface
+    // Creator is added as the initial speaker with HOST/MODERATOR role
     const newRoom: Room = {
       id: `room-${Date.now()}`,
       title,
@@ -78,8 +80,14 @@ const ViralLaunchpad: React.FC<ViralLaunchpadProps> = ({ isOpen, onClose, onLaun
       tags: tags.split(',').map(t => t.trim()),
       participantCount: 1,
       sentiment: 'neutral',
-      speakers: [],
-      listeners: []
+      speakers: [{
+        ...currentUser,
+        role: UserRole.HOST,
+        isMuted: false,
+        handRaised: false
+      }],
+      listeners: [],
+      posterUrl: adImage || undefined
     };
 
     // Trigger Notification to "Followers"
@@ -87,10 +95,10 @@ const ViralLaunchpad: React.FC<ViralLaunchpadProps> = ({ isOpen, onClose, onLaun
       id: `room-notif-${Date.now()}`,
       type: 'ROOM_START',
       title: 'New Room Launched',
-      message: `A Hub you follow just started: "${title}"`,
+      message: `${currentUser.name} just started: "${title}"`,
       timestamp: Date.now(),
       isRead: false,
-      senderAvatar: adImage || undefined
+      senderAvatar: adImage || currentUser.avatar
     });
 
     onLaunch(newRoom);

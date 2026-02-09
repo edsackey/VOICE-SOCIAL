@@ -6,9 +6,10 @@ import { useLocale } from './LocaleContext';
 
 interface CreatorStudioProps {
   currentUser: DBUser;
+  onLaunchHub?: () => void;
 }
 
-const CreatorStudio: React.FC<CreatorStudioProps> = ({ currentUser }) => {
+const CreatorStudio: React.FC<CreatorStudioProps> = ({ currentUser, onLaunchHub }) => {
   const { t, formatCurrency } = useLocale();
   const donations = StorageService.getAllDonations();
   const [filter, setFilter] = useState<'ALL' | 'DPO' | 'MOMO'>('ALL');
@@ -42,16 +43,25 @@ const CreatorStudio: React.FC<CreatorStudioProps> = ({ currentUser }) => {
           <h1 className="text-5xl font-black text-gray-900 tracking-tighter uppercase mb-2">Creator Hub</h1>
           <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.5em] ml-1">Strategic Financial Intelligence</p>
         </div>
-        <div className="flex bg-white/50 backdrop-blur-md rounded-2xl p-1.5 shadow-sm border border-white/50">
-           {['ALL', 'DPO', 'MOMO'].map((f) => (
-             <button
-              key={f}
-              onClick={() => setFilter(f as any)}
-              className={`px-8 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-indigo-600 text-white shadow-xl' : 'text-gray-400 hover:text-gray-600'}`}
-             >
-               {f}
-             </button>
-           ))}
+        <div className="flex items-center gap-4">
+           <button 
+            onClick={onLaunchHub}
+            className="bg-[var(--accent)] text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-accent/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+           >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              Start Live Hub
+           </button>
+           <div className="flex bg-white/50 backdrop-blur-md rounded-2xl p-1.5 shadow-sm border border-white/50">
+              {['ALL', 'DPO', 'MOMO'].map((f) => (
+                <button
+                 key={f}
+                 onClick={() => setFilter(f as any)}
+                 className={`px-8 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-indigo-600 text-white shadow-xl' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  {f}
+                </button>
+              ))}
+           </div>
         </div>
       </div>
 

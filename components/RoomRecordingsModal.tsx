@@ -7,17 +7,17 @@ interface RoomRecordingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   roomTitle: string;
+  roomId: string;
 }
 
-const RoomRecordingsModal: React.FC<RoomRecordingsModalProps> = ({ isOpen, onClose, roomTitle }) => {
+const RoomRecordingsModal: React.FC<RoomRecordingsModalProps> = ({ isOpen, onClose, roomTitle, roomId }) => {
   const [recordings, setRecordings] = useState<PodcastRecord[]>([]);
 
   useEffect(() => {
     if (isOpen) {
-      const allPodcasts = StorageService.getPodcasts();
-      setRecordings(allPodcasts.filter(p => p.title === roomTitle));
+      setRecordings(StorageService.getPodcasts(roomId));
     }
-  }, [isOpen, roomTitle]);
+  }, [isOpen, roomId]);
 
   const downloadMinutes = (podcast: PodcastRecord) => {
     const element = document.createElement("a");

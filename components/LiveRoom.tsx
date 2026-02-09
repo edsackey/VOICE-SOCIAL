@@ -45,6 +45,10 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [showSessionReport, setShowSessionReport] = useState(false);
   
+  // Minute Taker State
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [activeSummary, setActiveSummary] = useState<string | null>(null);
+  
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [lastSessionRecord, setLastSessionRecord] = useState<PodcastRecord | null>(null);
@@ -54,6 +58,9 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
   const [targetTranslationLang, setTargetTranslationLang] = useState<Locale>(currentUser.nativeLanguage || locale);
   const [isConnecting, setIsConnecting] = useState(false);
   
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [roomFollowers, setRoomFollowers] = useState(room.followerCount);
+
   const transcriptionEndRef = useRef<HTMLDivElement>(null);
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -79,6 +86,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
 
   useEffect(() => {
     StorageService.recordJoin(room.id, { id: currentUser.id, name: currentUser.name });
+    setIsFollowing(StorageService.isFollowingRoom(currentUser.id, room.id));
   }, [room.id, currentUser.id, currentUser.name]);
 
   useEffect(() => {
@@ -86,6 +94,39 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
       transcriptionEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [transcriptions, isFeedOpen, interimTranscription]);
+
+  const handleToggleFollow = () => {
+    StorageService.toggleFollowRoom(currentUser.id, room.id);
+    const nowFollowing = !isFollowing;
+    setIsFollowing(nowFollowing);
+    setRoomFollowers(prev => nowFollowing ? prev + 1 : Math.max(0, prev - 1));
+  };
+
+  const handleTakeMinutes = async () => {
+    if (transcriptions.length < 1) {
+      alert("No voice data captured yet to summarize.");
+      return;
+    }
+    setIsSummarizing(true);
+    try {
+      const minutes = await generateMeetingMinutes(room.title, transcriptions.map(t => `${t.userName}: ${t.text}`));
+      setActiveSummary(minutes);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const handleDownloadMinutesManual = (content: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([content], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `EchoHub_AI_Minutes_${room.title.replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   const startLiveEngine = async () => {
     if (sessionPromiseRef.current) return;
@@ -191,6 +232,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
           const minutes = await generateMeetingMinutes(room.title, transcriptions.map(t => `${t.userName}: ${t.text}`));
           const newRecord: PodcastRecord = {
             id: `chat-${Date.now()}`,
+            roomId: room.id,
             title: room.title,
             date: new Date().toLocaleDateString(),
             duration: formatDuration(recordingDuration),
@@ -222,13 +264,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
 
   const handleDownloadMinutes = () => {
     if (!lastSessionRecord) return;
-    const element = document.createElement("a");
-    const file = new Blob([lastSessionRecord.minutes], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `Chat-Chap_Minutes_${room.title.replace(/\s+/g, '_')}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    handleDownloadMinutesManual(lastSessionRecord.minutes);
   };
 
   const formatDuration = (seconds: number) => {
@@ -256,8 +292,17 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
           <h1 className="text-[11px] font-black text-[var(--text-main)] uppercase tracking-[0.2em] italic max-w-[180px] truncate text-center">
             {room.title}
           </h1>
-          <div className="flex items-center gap-2 mt-0.5">
-             <span className="text-[7px] font-black text-accent uppercase tracking-widest">{room.followerCount.toLocaleString()} Subscribers</span>
+          <div className="flex items-center gap-3 mt-1.5">
+             <div className="flex items-center gap-1">
+               <svg className="w-2.5 h-2.5 text-accent" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
+               <span className="text-[8px] font-black text-accent uppercase tracking-widest">{roomFollowers.toLocaleString()} Subscribers</span>
+             </div>
+             <button 
+              onClick={handleToggleFollow}
+              className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-accent text-white shadow-lg shadow-accent/20'}`}
+             >
+               {isFollowing ? 'Following' : '+ Follow'}
+             </button>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -308,7 +353,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
                 </div>
              </div>
              <div className="flex items-center gap-2">
-                <button onClick={() => setIsFeedOpen(!isFeedOpen)} className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest hover:text-[var(--accent)] flex items-center gap-2 px-4 py-2">
+                <button onClick={() => setIsFeedOpen(!isFeedOpen)} className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest hover:text-[var(--accent)] flex items-center gap-2 px-4 py-2 transition-colors">
                   {isFeedOpen ? 'Hide Pulse' : 'The Feed'}
                 </button>
                 {isHost && (
@@ -344,6 +389,22 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
          <div className="p-8 flex flex-col h-full">
             <div className="flex justify-between items-center mb-8">
                <h4 className="text-sm font-black uppercase tracking-[0.3em] text-[var(--text-main)] italic">{isMixerOpen ? 'Level Control' : 'Simultaneous Stream'}</h4>
+               
+               {!isMixerOpen && (
+                 <button 
+                  onClick={handleTakeMinutes}
+                  disabled={isSummarizing || transcriptions.length === 0}
+                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-30"
+                 >
+                   {isSummarizing ? (
+                     <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                   ) : (
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                   )}
+                   Smart Summary
+                 </button>
+               )}
+
                <button onClick={() => { setIsFeedOpen(false); setIsMixerOpen(false); }} className="p-3 bg-white/5 rounded-full"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg></button>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8 pb-12 px-6">
@@ -440,8 +501,44 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
       <LiveStreamConsole isOpen={isStreamConsoleOpen} onClose={() => setIsStreamConsoleOpen(false)} roomTitle={room.title} />
       <RoomAnalytics isOpen={isAnalyticsOpen} onClose={() => setIsAnalyticsOpen(false)} roomId={room.id} roomTitle={room.title} speakerStats={{}} />
       <TranslationLangSelector isOpen={isLangSelectorOpen} onClose={() => setIsLangSelectorOpen(false)} selectedLang={targetTranslationLang} onSelect={setTargetTranslationLang} />
-      <RoomRecordingsModal isOpen={isRecordingsOpen} onClose={() => setIsRecordingsOpen(false)} roomTitle={room.title} />
+      <RoomRecordingsModal isOpen={isRecordingsOpen} onClose={() => setIsRecordingsOpen(false)} roomTitle={room.title} roomId={room.id} />
       <AttendanceModal isOpen={isAttendanceOpen} onClose={() => setIsAttendanceOpen(false)} roomId={room.id} roomTitle={room.title} />
+
+      {/* Manual Smart Summary Modal */}
+      {activeSummary && (
+        <div className="fixed inset-0 z-[450] bg-indigo-950/95 backdrop-blur-3xl flex items-center justify-center p-6 animate-in zoom-in-95 duration-500">
+           <div className="w-full max-w-2xl bg-[var(--bg-secondary)] rounded-[64px] border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+              <div className="p-10 bg-indigo-600 text-white shrink-0 flex justify-between items-center">
+                 <div>
+                   <h2 className="text-3xl font-black uppercase tracking-tighter italic">AI Minute Taker</h2>
+                   <p className="text-[9px] font-bold uppercase tracking-[0.4em] opacity-60">Neural Session Synthesis</p>
+                 </div>
+                 <button onClick={() => setActiveSummary(null)} className="p-4 bg-black/20 rounded-full hover:bg-black/30 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-main/10">
+                 <div className="space-y-6">
+                    <h3 className="text-[12px] font-black text-indigo-500 uppercase tracking-[0.4em] flex items-center gap-3"><span className="w-8 h-0.5 bg-indigo-500" />Strategic Intel</h3>
+                    <div className="bg-[var(--bg-secondary)] p-8 rounded-[40px] border border-[var(--glass-border)] shadow-inner italic leading-relaxed text-lg whitespace-pre-wrap">{activeSummary}</div>
+                 </div>
+              </div>
+              <div className="p-10 bg-secondary border-t border-white/5 flex gap-4">
+                 <button 
+                  onClick={() => handleDownloadMinutesManual(activeSummary)}
+                  className="flex-1 bg-indigo-600 text-white py-6 rounded-[32px] font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-3"
+                 >
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                   Export Minutes (.txt)
+                 </button>
+                 <button 
+                  onClick={() => setActiveSummary(null)}
+                  className="px-10 py-6 bg-white/5 text-muted rounded-[32px] font-black uppercase tracking-widest text-[10px] border border-white/5 hover:bg-white/10"
+                 >
+                   Close
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {isFinalizing && (
         <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-3xl flex flex-col items-center justify-center animate-in fade-in">

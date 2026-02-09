@@ -130,7 +130,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-main text-main selection:bg-accent selection:text-white transition-colors duration-500">
-      <VoiceAssistant onNavigate={setActiveTab} onMuteToggle={() => {}} />
+      <VoiceAssistant onNavigate={setActiveTab} onMuteToggle={() => {}} onOpenCreationPortal={() => setIsLaunchpadOpen(true)} />
       <NotificationToast notification={currentToast} onClose={() => setCurrentToast(null)} />
 
       {activeCall && <CallOverlay call={activeCall} onEndCall={() => setActiveCall(null)} currentUser={currentUser} />}
@@ -182,7 +182,7 @@ const App: React.FC = () => {
             {activeTab === 'schedule' && <ScheduleView currentUser={currentUser as any} />}
             {activeTab === 'calls' && <CallsView onJoinRoom={setActiveRoom} onInitiateCall={(u, t) => setActiveCall({id:'1', type:t, participants:[currentUser, u], startTime:Date.now()})} onUserClick={setSelectedUser} />}
             {activeTab === 'groups' && <GroupsView currentUser={currentUser as any} />}
-            {activeTab === 'creator' && <CreatorStudio currentUser={currentUser as any} />}
+            {activeTab === 'creator' && <CreatorStudio currentUser={currentUser as any} onLaunchHub={() => setIsLaunchpadOpen(true)} />}
           </main>
 
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-6">
@@ -219,7 +219,12 @@ const App: React.FC = () => {
         />
       )}
 
-      <ViralLaunchpad isOpen={isLaunchpadOpen} onClose={() => setIsLaunchpadOpen(false)} onLaunch={(r) => { setActiveRoom(r); setIsLaunchpadOpen(false); }} />
+      <ViralLaunchpad 
+        isOpen={isLaunchpadOpen} 
+        onClose={() => setIsLaunchpadOpen(false)} 
+        currentUser={currentUser}
+        onLaunch={(r) => { setActiveRoom(r); setIsLaunchpadOpen(false); }} 
+      />
       <PodcastArchive isOpen={isArchiveOpen} onClose={() => setIsArchiveOpen(false)} />
       <LanguagePicker isOpen={isLangPickerOpen} onClose={() => setIsLangPickerOpen(false)} />
       <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} notifications={notifications} onRefresh={refreshNotifications} />

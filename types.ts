@@ -116,6 +116,7 @@ export interface BackgroundAudio {
 
 export interface PodcastRecord {
   id: string;
+  roomId: string;
   title: string;
   date: string;
   duration: string;
