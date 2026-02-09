@@ -37,6 +37,20 @@ export async function decodeAudioData(
   return buffer;
 }
 
+/**
+ * Resamples a Float32Array from one sample rate to another using basic point sampling.
+ */
+export function resample(data: Float32Array, fromRate: number, toRate: number): Float32Array {
+  if (fromRate === toRate) return data;
+  const ratio = fromRate / toRate;
+  const newLength = Math.round(data.length / ratio);
+  const result = new Float32Array(newLength);
+  for (let i = 0; i < newLength; i++) {
+    result[i] = data[Math.min(Math.round(i * ratio), data.length - 1)];
+  }
+  return result;
+}
+
 export function createBlob(data: Float32Array): { data: string; mimeType: string } {
   const l = data.length;
   const int16 = new Int16Array(l);

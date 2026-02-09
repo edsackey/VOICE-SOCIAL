@@ -86,12 +86,12 @@ const Avatar: React.FC<AvatarProps> = ({ user, size = 'md', showBadge = true, on
             onClick={e => e.stopPropagation()}
           >
             <div className="flex-1 w-full flex items-center justify-center relative">
+               {/* Removed non-standard 'orientation' attribute which caused TS error */}
                <input 
                  type="range"
                  min="0"
                  max="1.5"
                  step="0.05"
-                 orientation="vertical"
                  value={volume}
                  onChange={(e) => onVolumeChange(user.id, parseFloat(e.target.value))}
                  className="absolute w-16 -rotate-90 bg-transparent appearance-none cursor-pointer accent-[var(--accent)]"

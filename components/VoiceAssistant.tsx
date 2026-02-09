@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { useLocale } from './LocaleContext';
 import { appControlTools } from '../services/geminiService';
-import { decode, decodeAudioData, createBlob } from '../services/audioUtils';
+import { decode, decodeAudioData, createBlob, resample } from '../services/audioUtils';
 
 interface VoiceAssistantProps {
   onNavigate: (tab: any) => void;
@@ -37,8 +37,9 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const inputCtx = new AudioContext({ sampleRate: 16000 });
-      const outputCtx = new AudioContext({ sampleRate: 24000 });
+      // Initialize context with default sample rate to match stream and avoid NotSupportedError
+      const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = inputCtx;
       outputAudioContextRef.current = outputCtx;
 
@@ -52,7 +53,9 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onNavigate, onMuteToggl
             scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
               if (!isListening) return;
               const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-              const pcmBlob = createBlob(inputData);
+              // Resample from hardware rate to 16000Hz required by the API
+              const resampledData = resample(inputData, inputCtx.sampleRate, 16000);
+              const pcmBlob = createBlob(resampledData);
               sessionPromise.then((session) => {
                 session.sendRealtimeInput({ media: pcmBlob });
               });

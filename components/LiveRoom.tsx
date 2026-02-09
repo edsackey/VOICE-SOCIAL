@@ -11,10 +11,11 @@ import LiveStreamConsole from './LiveStreamConsole';
 import RoomAnalytics from './RoomAnalytics';
 import TranslationLangSelector from './TranslationLangSelector';
 import RoomRecordingsModal from './RoomRecordingsModal';
+import AttendanceModal from './AttendanceModal';
 import { generateMeetingMinutes } from '../services/geminiService';
 import { StorageService } from '../services/storageService';
 import { useLocale } from './LocaleContext';
-import { decode, decodeAudioData, createBlob } from '../services/audioUtils';
+import { decode, decodeAudioData, createBlob, resample } from '../services/audioUtils';
 
 interface LiveRoomProps {
   room: Room;
@@ -26,8 +27,9 @@ interface LiveRoomProps {
 }
 
 const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolumes, onVolumeChange, currentUser }) => {
-  const { locale, isBilingual, setIsBilingual } = useLocale();
+  const { locale, isBilingual } = useLocale();
   const [transcriptions, setTranscriptions] = useState<TranscriptionEntry[]>([]);
+  const [interimTranscription, setInterimTranscription] = useState<string>('');
   const [isMuted, setIsMuted] = useState(true);
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isMediaOpen, setIsMediaOpen] = useState(false);
@@ -35,6 +37,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isStreamConsoleOpen, setIsStreamConsoleOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [isFeedOpen, setIsFeedOpen] = useState(false);
   const [isLangSelectorOpen, setIsLangSelectorOpen] = useState(false);
   const [isRecordingsOpen, setIsRecordingsOpen] = useState(false);
@@ -63,10 +66,14 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
   const isHost = currentUser.id === 'me' || currentUser.role === UserRole.HOST;
 
   useEffect(() => {
-    if (isFeedOpen) {
+    StorageService.recordJoin(room.id, { id: currentUser.id, name: currentUser.name });
+  }, [room.id, currentUser.id, currentUser.name]);
+
+  useEffect(() => {
+    if (isFeedOpen || interimTranscription) {
       transcriptionEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [transcriptions, isFeedOpen]);
+  }, [transcriptions, isFeedOpen, interimTranscription]);
 
   const startLiveEngine = async () => {
     if (sessionPromiseRef.current) return;
@@ -74,7 +81,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const inputCtx = new AudioContext({ sampleRate: 16000 });
+      const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = inputCtx;
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -84,10 +91,12 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
           onopen: () => {
             const source = inputCtx.createMediaStreamSource(stream);
             const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
-            scriptProcessor.onaudioprocess = (e) => {
+            scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
               if (isMuted) return;
-              const inputData = e.inputBuffer.getChannelData(0);
-              const pcmBlob = createBlob(inputData);
+              const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+              const resampledData = resample(inputData, inputCtx.sampleRate, 16000);
+              const pcmBlob = createBlob(resampledData);
+              // CRITICAL: Solely rely on sessionPromise resolves and then call `session.sendRealtimeInput`
               sessionPromise.then((session) => {
                 session.sendRealtimeInput({ media: pcmBlob });
               });
@@ -98,7 +107,9 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
           },
           onmessage: async (message: LiveServerMessage) => {
             if (message.serverContent?.inputTranscription) {
-              currentTranscriptionRef.current = message.serverContent.inputTranscription.text;
+              const text = message.serverContent.inputTranscription.text;
+              currentTranscriptionRef.current = text;
+              setInterimTranscription(text);
             }
             if (message.serverContent?.outputTranscription) {
               const translatedText = message.serverContent.outputTranscription.text;
@@ -110,8 +121,9 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
                   translation: translatedText,
                   timestamp: Date.now()
                 };
-                setTranscriptions(prev => [...prev.slice(-40), newEntry]);
+                setTranscriptions(prev => [...prev.slice(-100), newEntry]);
                 currentTranscriptionRef.current = '';
+                setInterimTranscription('');
               }
             }
           },
@@ -119,6 +131,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
           onclose: () => {
             sessionPromiseRef.current = null;
             setIsConnecting(false);
+            setInterimTranscription('');
           },
         },
         config: {
@@ -145,6 +158,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
 
   useEffect(() => {
     if (sessionPromiseRef.current) {
+      // Fix: Access .current on the sessionPromiseRef object to invoke .then()
       sessionPromiseRef.current.then(s => s.close());
       sessionPromiseRef.current = null;
       if (!isMuted) startLiveEngine();
@@ -152,6 +166,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
   }, [isBilingual, targetTranslationLang]);
 
   const startRecording = async () => {
+    if (!isHost) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -163,6 +178,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
         const audioUrl = URL.createObjectURL(audioBlob);
         setIsFinalizing(true);
         try {
+          // Send all captured transcriptions for AI minutes generation
           const minutes = await generateMeetingMinutes(room.title, transcriptions.map(t => `${t.userName}: ${t.text}`));
           const newRecord: PodcastRecord = {
             id: `echo-${Date.now()}`,
@@ -193,6 +209,27 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
       setIsRecording(false);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     }
+  };
+
+  const handleDownloadMinutes = () => {
+    if (!lastSessionRecord) return;
+    const element = document.createElement("a");
+    const file = new Blob([lastSessionRecord.minutes], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `EchoHub_Minutes_${room.title.replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleDownloadAudio = () => {
+    if (!lastSessionRecord) return;
+    const element = document.createElement("a");
+    element.href = lastSessionRecord.audioUrl;
+    element.download = `EchoHub_Audio_${room.title.replace(/\s+/g, '_')}.webm`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
   };
 
   const formatDuration = (seconds: number) => {
@@ -233,6 +270,20 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
         <div className="max-w-3xl mx-auto space-y-10 py-6 px-6">
           <section className="relative">
             <ProjectionView media={currentMedia} room={room} />
+            
+            {interimTranscription && (
+              <div className="absolute bottom-10 left-10 right-10 z-30 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="premium-glass rounded-[32px] p-6 shadow-2xl border-indigo-500/30 ring-4 ring-indigo-500/10">
+                   <div className="flex items-center gap-3 mb-2">
+                     <div className="w-8 h-8 rounded-xl overflow-hidden border border-indigo-500/50">
+                        <img src={currentUser.avatar} className="w-full h-full object-cover" alt="" />
+                     </div>
+                     <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic animate-pulse">Live Echoing</span>
+                   </div>
+                   <p className="text-xl font-black text-slate-900 leading-tight">"{interimTranscription}"</p>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="bg-[var(--bg-secondary)] rounded-[32px] p-4 flex flex-col sm:flex-row items-center justify-between shadow-sm border border-[var(--glass-border)] gap-4">
@@ -299,24 +350,50 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
                     ))}
                  </div>
                ) : (
-                 transcriptions.map((t, i) => (
-                   <div key={i} className="animate-in slide-in-from-bottom-4 group">
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className="w-10 h-10 rounded-[14px] border border-[var(--accent)]/30 overflow-hidden"><img src={`https://picsum.photos/seed/${t.userId}/100/100`} className="w-full h-full object-cover" alt="" /></div>
-                        <div><p className="text-[10px] font-black text-[var(--accent)] uppercase italic">{t.userName}</p><span className="text-[8px] text-slate-400 font-bold">{new Date(t.timestamp).toLocaleTimeString()}</span></div>
-                      </div>
-                      <div className="space-y-3 pl-14">
-                        <p className={`text-base font-medium text-[var(--text-main)] leading-relaxed italic ${isBilingual ? 'opacity-50' : 'opacity-80'}`}>"{t.text}"</p>
-                        {t.translation && (targetTranslationLang !== 'en' || isBilingual) && (
-                          <div className="bg-[var(--accent)]/5 p-6 rounded-[28px] border border-[var(--accent)]/10 relative overflow-hidden group-hover:bg-[var(--accent)]/10 transition-all mt-2">
-                            <div className="absolute top-0 left-0 w-1.5 h-full bg-[var(--accent)]" />
-                            <p className="text-[8px] font-black text-[var(--accent)] uppercase tracking-widest mb-2 flex items-center gap-2">Nexus Echo ({targetTranslationLang.toUpperCase()})</p>
-                            <p className="text-base font-bold text-[var(--text-main)] italic leading-relaxed">"{t.translation}"</p>
+                 <>
+                   {transcriptions.map((t, i) => (
+                     <div key={i} className="animate-in slide-in-from-bottom-4 group">
+                        <div className="flex items-center gap-4 mb-3">
+                          <div className="w-10 h-10 rounded-[14px] border border-[var(--accent)]/30 overflow-hidden shadow-sm">
+                            <img src={t.userId === currentUser.id ? currentUser.avatar : `https://picsum.photos/seed/${t.userId}/100/100`} className="w-full h-full object-cover" alt="" />
                           </div>
-                        )}
-                      </div>
-                   </div>
-                 ))
+                          <div>
+                            <p className="text-[10px] font-black text-[var(--accent)] uppercase italic">{t.userName}</p>
+                            <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{new Date(t.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-3 pl-14">
+                          <p className={`text-base font-medium text-[var(--text-main)] leading-relaxed italic ${isBilingual ? 'opacity-50' : 'opacity-80'}`}>"{t.text}"</p>
+                          {t.translation && (targetTranslationLang !== 'en' || isBilingual) && (
+                            <div className="bg-[var(--accent)]/5 p-6 rounded-[28px] border border-[var(--accent)]/10 relative overflow-hidden group-hover:bg-[var(--accent)]/10 transition-all mt-2">
+                              <div className="absolute top-0 left-0 w-1.5 h-full bg-[var(--accent)]" />
+                              <p className="text-[8px] font-black text-[var(--accent)] uppercase tracking-widest mb-2 flex items-center gap-2">Nexus Echo ({targetTranslationLang.toUpperCase()})</p>
+                              <p className="text-base font-bold text-[var(--text-main)] italic leading-relaxed">"{t.translation}"</p>
+                            </div>
+                          )}
+                        </div>
+                     </div>
+                   ))}
+                   {interimTranscription && (
+                     <div className="animate-in fade-in duration-200 opacity-60">
+                        <div className="flex items-center gap-4 mb-3">
+                          <div className="w-10 h-10 rounded-[14px] border border-[var(--accent)]/10 overflow-hidden ring-2 ring-accent/5 ring-offset-2">
+                            <img src={currentUser.avatar} className="w-full h-full object-cover" alt="" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-[var(--accent)] uppercase italic">{currentUser.name}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] text-accent/60 font-black uppercase animate-pulse">Neural Streaming...</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="pl-14">
+                          <p className="text-base font-medium text-[var(--text-main)] leading-relaxed italic opacity-40 animate-pulse">"{interimTranscription}"</p>
+                        </div>
+                     </div>
+                   )}
+                   <div ref={transcriptionEndRef} className="h-20" />
+                 </>
                )}
             </div>
          </div>
@@ -326,7 +403,11 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
         <div className="bg-[var(--bg-main)]/90 backdrop-blur-3xl rounded-full p-4 flex justify-between items-center shadow-[0_32px_64px_rgba(0,0,0,0.4)] border border-white/10">
            <div className="flex items-center gap-2">
               <button onClick={() => setIsMediaOpen(true)} className="p-5 bg-[var(--bg-secondary)] rounded-full text-[var(--text-muted)] hover:text-[var(--accent)] transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></button>
-              <button onClick={() => isRecording ? stopRecording() : startRecording()} className={`p-5 rounded-full transition-all ${isRecording ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-red-500'}`}><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg></button>
+              {isHost && (
+                <button onClick={() => isRecording ? stopRecording() : startRecording()} className={`p-5 rounded-full transition-all ${isRecording ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-red-500'}`} title={isRecording ? "Stop Recording" : "Start Hub Recording"}>
+                  <svg className={`w-6 h-6 ${isRecording ? 'animate-pulse' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
+                </button>
+              )}
            </div>
            <div className="flex items-center gap-4">
               <button onClick={() => setIsMuted(!isMuted)} className={`p-7 rounded-full transition-all transform hover:scale-105 shadow-2xl ${isMuted ? 'bg-[var(--bg-secondary)] text-slate-400' : 'bg-[var(--accent)] text-white shadow-[var(--accent-glow)]'}`}>{isMuted ? '🔇' : '🎙️'}</button>
@@ -334,7 +415,10 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
            </div>
            <div className="flex items-center gap-2">
               <button onClick={() => { setIsMixerOpen(!isMixerOpen); setIsFeedOpen(false); }} className={`p-5 rounded-full transition-all ${isMixerOpen ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-muted)]'}`}><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg></button>
-              <button onClick={() => setIsAnalyticsOpen(true)} className="p-5 bg-[var(--bg-secondary)] rounded-full text-[var(--text-muted)]"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg></button>
+              <button onClick={() => setIsAttendanceOpen(true)} className={`p-5 rounded-full transition-all ${isAttendanceOpen ? 'bg-[var(--accent)] text-white shadow-lg' : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--accent)]'}`} title="View Attendance">
+                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" /></svg>
+              </button>
+              <button onClick={() => setIsAnalyticsOpen(true)} className="p-5 bg-[var(--bg-secondary)] rounded-full text-[var(--text-muted)]"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg></button>
            </div>
         </div>
       </div>
@@ -346,6 +430,7 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
       <RoomAnalytics isOpen={isAnalyticsOpen} onClose={() => setIsAnalyticsOpen(false)} roomId={room.id} roomTitle={room.title} speakerStats={{}} />
       <TranslationLangSelector isOpen={isLangSelectorOpen} onClose={() => setIsLangSelectorOpen(false)} selectedLang={targetTranslationLang} onSelect={setTargetTranslationLang} />
       <RoomRecordingsModal isOpen={isRecordingsOpen} onClose={() => setIsRecordingsOpen(false)} roomTitle={room.title} />
+      <AttendanceModal isOpen={isAttendanceOpen} onClose={() => setIsAttendanceOpen(false)} roomId={room.id} roomTitle={room.title} />
 
       {isFinalizing && (
         <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-3xl flex flex-col items-center justify-center animate-in fade-in">
@@ -369,8 +454,20 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
                     </div>
                     <div className="flex flex-col gap-8 justify-center">
                        <h3 className="text-[14px] font-black text-orange-500 uppercase tracking-[0.4em] flex items-center gap-3"><span className="w-8 h-0.5 bg-orange-500" />Echo Master Suite</h3>
-                       <button className="group bg-indigo-600 text-white p-10 rounded-[48px] shadow-2xl flex items-center justify-between border-4 border-indigo-500/20"><p className="text-2xl font-black uppercase">Echo Minutes (.txt)</p></button>
-                       <button className="group bg-orange-500 text-white p-10 rounded-[48px] shadow-2xl flex items-center justify-between border-4 border-orange-400/20"><p className="text-2xl font-black uppercase">Audio Master (.webm)</p></button>
+                       <button onClick={handleDownloadMinutes} className="group bg-indigo-600 text-white p-10 rounded-48 shadow-2xl flex items-center justify-between border-4 border-indigo-500/20 active:scale-95 transition-all">
+                         <div className="text-left">
+                            <p className="text-2xl font-black uppercase">Echo Minutes</p>
+                            <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">Download .txt Transcript</p>
+                         </div>
+                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                       </button>
+                       <button onClick={handleDownloadAudio} className="group bg-orange-500 text-white p-10 rounded-48 shadow-2xl flex items-center justify-between border-4 border-orange-400/20 active:scale-95 transition-all">
+                         <div className="text-left">
+                            <p className="text-2xl font-black uppercase">Audio Master</p>
+                            <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">Download .webm Broadcast</p>
+                         </div>
+                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                       </button>
                     </div>
                  </div>
               </div>

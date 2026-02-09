@@ -14,6 +14,24 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, room
 
   if (!isOpen) return null;
 
+  const handleExportCSV = () => {
+    if (attendance.length === 0) return;
+    const header = "User ID,User Name,Join Time\n";
+    const rows = attendance.map(r => 
+      `${r.userId},"${r.userName.replace(/"/g, '""')}",${new Date(r.joinTime).toLocaleString()}`
+    ).join("\n");
+    
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Attendance_${roomTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="fixed inset-0 z-[600] bg-indigo-950/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={onClose}>
       <div 
@@ -62,7 +80,13 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, room
 
         <div className="p-8 bg-white border-t border-gray-100 shrink-0 flex justify-between items-center">
            <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest">Total Participants: {attendance.length}</p>
-           <button className="text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:underline">Export CSV</button>
+           <button 
+            onClick={handleExportCSV}
+            disabled={attendance.length === 0}
+            className="text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:underline disabled:opacity-30 disabled:no-underline"
+           >
+             Export CSV
+           </button>
         </div>
       </div>
     </div>
