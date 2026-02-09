@@ -30,7 +30,7 @@ const ProjectionView: React.FC<ProjectionViewProps> = ({ media, room }) => {
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
             <div className="bg-accent/30 backdrop-blur-md px-6 py-2 rounded-full border border-accent/40 mb-6">
               <span className="text-[10px] font-black text-white uppercase tracking-[0.6em] animate-pulse">
-                {media?.type === 'banner' ? 'Custom Visual Active' : 'Live Global Hub'}
+                {media?.type === 'banner' ? 'Custom Visual Active' : 'EchoHub Stage Live'}
               </span>
             </div>
             <h2 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter italic drop-shadow-2xl max-w-2xl leading-tight">
@@ -52,17 +52,30 @@ const ProjectionView: React.FC<ProjectionViewProps> = ({ media, room }) => {
         <div className="absolute inset-0 bg-slate-950 animate-in fade-in duration-500 overflow-hidden">
            <div className="absolute top-8 left-8 z-30 flex items-center gap-3">
               <div className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
-              <span className="text-[10px] font-black text-white uppercase tracking-widest bg-red-600 px-5 py-2 rounded-xl shadow-lg">LIVE BROADCAST</span>
+              <span className="text-[10px] font-black text-white uppercase tracking-widest bg-red-600 px-5 py-2 rounded-xl shadow-lg">LIVE UPLINK</span>
            </div>
            
            <div className="w-full h-full flex flex-col items-center justify-center relative p-8">
               <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,_var(--accent),_transparent_70%)]" />
               <div className="w-full h-full bg-slate-900/50 rounded-[40px] border border-white/10 backdrop-blur-3xl p-10 flex flex-col gap-6 shadow-2xl relative z-10">
-                 <div className="h-5 w-1/4 bg-white/10 rounded-full" />
+                 <div className="flex justify-between items-center mb-4">
+                    <div className="h-4 w-32 bg-white/10 rounded-full" />
+                    <div className="flex gap-2">
+                       <div className="w-3 h-3 bg-white/20 rounded-full" />
+                       <div className="w-3 h-3 bg-white/20 rounded-full" />
+                       <div className="w-3 h-3 bg-white/20 rounded-full" />
+                    </div>
+                 </div>
                  <div className="grid grid-cols-1 gap-6 flex-1">
-                    <div className="bg-white/5 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-6">
-                       <svg className="w-20 h-20 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                       <p className="text-[11px] font-black text-white/30 uppercase tracking-[0.5em]">Synchronizing Interface...</p>
+                    <div className="bg-white/5 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-6 relative overflow-hidden">
+                       <div className="absolute inset-0 flex items-center justify-center opacity-5">
+                          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,50 Q25,0 50,50 T100,50" fill="none" stroke="currentColor" strokeWidth="0.5" /></svg>
+                       </div>
+                       <svg className="w-20 h-20 text-accent animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                       <div className="text-center">
+                          <p className="text-[12px] font-black text-white uppercase tracking-[0.6em]">Synchronizing Workflow...</p>
+                          <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mt-2">EchoHub Desktop Casting Active</p>
+                       </div>
                     </div>
                  </div>
               </div>
@@ -89,7 +102,7 @@ const ProjectionView: React.FC<ProjectionViewProps> = ({ media, room }) => {
         <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center bg-slate-950 animate-in slide-in-from-bottom-2 duration-500">
           <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_var(--accent),_transparent_70%)]" />
           <h2 className="text-accent text-[10px] font-black uppercase tracking-[0.8em] mb-10">
-            {media.type === 'scripture' ? 'Neural Revelation' : 'Voice Lyric Feed'}
+            {media.type === 'scripture' ? 'EchoHub Scripture Vault' : 'Live Lyric Feed'}
           </h2>
           <div className="max-w-2xl">
             <p className="text-white text-3xl sm:text-5xl font-black leading-tight mb-10 drop-shadow-2xl italic tracking-tight">

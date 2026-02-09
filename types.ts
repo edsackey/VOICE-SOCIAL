@@ -1,6 +1,6 @@
 
 /**
- * Chat-Chap Global Application Types
+ * EchoHub Global Application Types
  */
 
 export enum UserRole {
