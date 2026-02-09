@@ -15,7 +15,8 @@ const KEYS = {
   PROMOS: 'vrl_db_monetized_promos',
   PODCASTS: 'voiceroomlive_podcasts',
   NOTIFICATIONS: 'chat_chap_notifications',
-  CALL_HISTORY: 'chat_chap_call_history'
+  CALL_HISTORY: 'chat_chap_call_history',
+  ROOM_FOLLOWS: 'chat_chap_room_follows'
 };
 
 const get = <T>(key: string): T[] => {
@@ -83,6 +84,25 @@ export const StorageService = {
   },
   getAttendance: (roomId: string) => get<AttendanceRecord>(`${KEYS.ATTENDANCE}_${roomId}`),
   
+  // Room Follows
+  isFollowingRoom: (userId: string, roomId: string) => {
+    const follows = get<{userId: string, roomId: string}>(KEYS.ROOM_FOLLOWS);
+    return follows.some(f => f.userId === userId && f.roomId === roomId);
+  },
+  toggleFollowRoom: (userId: string, roomId: string) => {
+    let follows = get<{userId: string, roomId: string}>(KEYS.ROOM_FOLLOWS);
+    const existing = follows.find(f => f.userId === userId && f.roomId === roomId);
+    if (existing) {
+      follows = follows.filter(f => !(f.userId === userId && f.roomId === roomId));
+    } else {
+      follows.push({ userId, roomId });
+    }
+    set(KEYS.ROOM_FOLLOWS, follows);
+  },
+  getRoomFollowers: (roomId: string) => {
+    return get<{userId: string, roomId: string}>(KEYS.ROOM_FOLLOWS).filter(f => f.roomId === roomId);
+  },
+
   // Groups
   getGroups: () => get<EchoGroup>(KEYS.GROUPS),
   saveGroup: (group: EchoGroup) => {

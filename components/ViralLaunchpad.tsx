@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { generateRoomIdeas, generatePromoContent, generateAdPoster, generateVoiceTeaser } from '../services/geminiService';
 import { Room } from '../types';
@@ -69,10 +68,13 @@ const ViralLaunchpad: React.FC<ViralLaunchpadProps> = ({ isOpen, onClose, onLaun
   };
 
   const handleFinalLaunch = () => {
+    // Fix: Added missing required properties 'followerCount' and 'followers' for Room interface
     const newRoom: Room = {
       id: `room-${Date.now()}`,
       title,
       description,
+      followerCount: 0,
+      followers: [],
       tags: tags.split(',').map(t => t.trim()),
       participantCount: 1,
       sentiment: 'neutral',

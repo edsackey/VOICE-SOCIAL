@@ -41,6 +41,8 @@ export interface Room {
   title: string;
   description: string;
   participantCount: number;
+  followerCount: number;
+  followers: string[]; // User IDs
   tags: string[];
   sentiment: 'positive' | 'neutral' | 'intense' | 'controversial';
   speakers: User[];

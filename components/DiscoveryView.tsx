@@ -98,7 +98,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
             <div 
               key={room.id}
               onClick={() => room.isLive && onJoinRoom(room)}
-              className="group relative h-[380px] bg-[var(--bg-secondary)] rounded-[24px] overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl border border-[var(--glass-border)]"
+              className="group relative h-[420px] bg-[var(--bg-secondary)] rounded-[24px] overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl border border-[var(--glass-border)]"
             >
               <img 
                 src={room.posterUrl || `https://picsum.photos/seed/${room.id}/800/800`} 
@@ -108,14 +108,18 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
               
               <div className="relative h-full p-8 flex flex-col justify-end">
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-4">
                   {room.isLive && (
                     <div className="bg-red-600 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest animate-pulse">
                       LIVE
                     </div>
                   )}
                   <div className="px-3 py-1 rounded-md text-[9px] font-black uppercase border border-white/20 bg-white/10 text-white/90 backdrop-blur-md">
-                    {room.participantCount} LISTENERS
+                    {room.participantCount} PULSING
+                  </div>
+                  <div className="px-3 py-1 rounded-md text-[9px] font-black uppercase border border-white/20 bg-[var(--accent)]/40 text-white backdrop-blur-md flex items-center gap-1.5">
+                    <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
+                    {room.followerCount.toLocaleString()} FOLLOWERS
                   </div>
                 </div>
 
@@ -124,10 +128,15 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
                 </h3>
                 
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-                  <div className="flex -space-x-2">
-                    {room.speakers.slice(0, 3).map(s => (
-                      <img key={s.id} src={s.avatar} className="w-8 h-8 rounded-full border-2 border-[var(--bg-secondary)] shadow-sm" alt="" />
-                    ))}
+                  <div className="flex items-center gap-3">
+                    <div className="flex -space-x-2">
+                      {room.speakers.slice(0, 3).map(s => (
+                        <img key={s.id} src={s.avatar} className="w-8 h-8 rounded-full border-2 border-[var(--bg-secondary)] shadow-sm" alt="" />
+                      ))}
+                    </div>
+                    {room.followerCount > 100 && (
+                      <span className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Verified Tribe</span>
+                    )}
                   </div>
                   <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg">
                     <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { generateRoomIdeas, generatePromoContent, generateAdPoster } from '../services/geminiService';
 import { Room, UserRole } from '../types';
@@ -52,10 +51,13 @@ const RoomPromotionHub: React.FC<RoomPromotionHubProps> = ({ isOpen, onClose, on
   };
 
   const handleFinalLaunch = () => {
+    // Fix: Added missing required properties 'followerCount' and 'followers' for Room interface
     const newRoom: Room = {
       id: `room-${Date.now()}`,
       title,
       description,
+      followerCount: 0,
+      followers: [],
       tags: tags.split(',').map(t => t.trim()),
       participantCount: 1,
       sentiment: 'neutral',

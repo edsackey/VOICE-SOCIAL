@@ -256,6 +256,9 @@ const LiveRoom: React.FC<LiveRoomProps> = ({ room, onExit, onUserClick, userVolu
           <h1 className="text-[11px] font-black text-[var(--text-main)] uppercase tracking-[0.2em] italic max-w-[180px] truncate text-center">
             {room.title}
           </h1>
+          <div className="flex items-center gap-2 mt-0.5">
+             <span className="text-[7px] font-black text-accent uppercase tracking-widest">{room.followerCount.toLocaleString()} Subscribers</span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
            {isHost && raisedHandCount > 0 && (
