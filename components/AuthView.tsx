@@ -1,14 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   sendEmailVerification, 
   signOut,
   signInWithPopup,
-  GoogleAuthProvider
+  GoogleAuthProvider,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { auth } from '../services/firebase';
+import { StorageService } from '../services/storageService';
 
 interface AuthViewProps {
   onAuthenticated: () => void;
@@ -16,56 +18,58 @@ interface AuthViewProps {
 
 type AuthMode = 'login' | 'register' | 'verify';
 
+const FEATURES = [
+  {
+    image: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&q=80&w=1200",
+    title: "Chat-Chap Live",
+    desc: "Speak your mind, find your tribe."
+  },
+  {
+    image: "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=1200",
+    title: "Global Voices",
+    desc: "Bilingual AI translation in real-time."
+  },
+  {
+    image: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&q=80&w=1200",
+    title: "Private Hubs",
+    desc: "Your personal stage for audio excellence."
+  }
+];
+
 const AuthView: React.FC<AuthViewProps> = ({ onAuthenticated }) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [verifyEmail, setVerifyEmail] = useState('');
+  const [featureIndex, setFeatureIndex] = useState(0);
+  const [theme, setTheme] = useState<'midnight' | 'light'>(() => {
+    return (localStorage.getItem('chat_chap_theme_pref') as any) || 'light';
+  });
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(userCredential.user);
-      setVerifyEmail(email);
-      await signOut(auth);
-      setMode('verify');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('chat_chap_theme_pref', theme);
+  }, [theme]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      if (!userCredential.user.emailVerified) {
-        setVerifyEmail(email);
-        await signOut(auth);
-        setMode('verify');
-      } else {
-        onAuthenticated();
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFeatureIndex(prev => (prev + 1) % FEATURES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'midnight' ? 'light' : 'midnight');
   };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
-    const provider = new GoogleAuthProvider();
     try {
+      const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       onAuthenticated();
     } catch (err: any) {
@@ -75,118 +79,176 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthenticated }) => {
     }
   };
 
-  if (mode === 'verify') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f7f3e9] p-6">
-        <div className="w-full max-w-md bg-white rounded-[48px] p-12 shadow-2xl text-center animate-in zoom-in-95 duration-300">
-          <div className="w-20 h-20 bg-indigo-100 rounded-[32px] flex items-center justify-center text-indigo-600 mx-auto mb-8">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-          </div>
-          <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-4">Verify Email</h2>
-          <p className="text-gray-500 font-medium leading-relaxed mb-10">
-            We have sent you a verification email to <span className="text-indigo-600 font-bold">{verifyEmail}</span>. Please verify it and log in.
-          </p>
-          <button 
-            onClick={() => setMode('login')}
-            className="w-full bg-indigo-600 text-white py-5 rounded-[24px] font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      if (mode === 'register') {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await updateProfile(user, { displayName: displayName || username });
+        StorageService.saveUser({
+          id: user.uid,
+          username: username.toLowerCase().replace(/\s/g, ''),
+          email: email,
+          createdAt: Date.now(),
+          displayName: displayName || username,
+          profilePictureUrl: `https://picsum.photos/seed/${user.uid}/200`
+        });
+        await sendEmailVerification(user);
+        await signOut(auth);
+        setMode('verify');
+      } else {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        if (!userCredential.user.emailVerified) {
+          await signOut(auth);
+          setMode('verify');
+        } else {
+          onAuthenticated();
+        }
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f7f3e9] p-6 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-200/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-200/20 rounded-full blur-[120px] pointer-events-none" />
-
-      <div className="w-full max-w-md bg-white rounded-[56px] p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] animate-in fade-in slide-in-from-bottom-4 duration-500 border border-white/50 relative z-10">
-        <div className="flex flex-col items-center mb-10">
-          <div className="bg-indigo-600 text-white p-4 rounded-[24px] shadow-2xl shadow-indigo-100 mb-6">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-          </div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight uppercase tracking-[0.05em]">VOICE SOCIAL</h1>
-          <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.3em] mt-2">Next-Gen Social Audio</p>
-        </div>
-
-        <h2 className="text-sm font-black text-gray-800 uppercase tracking-widest text-center mb-8 bg-gray-50 py-3 rounded-2xl border border-gray-100">
-          {mode === 'login' ? 'Welcome Back' : 'Join the Tribe'}
-        </h2>
-
-        {error && (
-          <div className="bg-red-50 text-red-600 p-5 rounded-[24px] text-xs font-bold mb-6 border border-red-100 flex items-center gap-3 animate-in shake duration-300">
-            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-4 mb-8">
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-6">Email Address</label>
-            <input 
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="w-full bg-gray-50 border-2 border-transparent focus:border-indigo-100 rounded-[28px] p-5 text-sm font-bold text-gray-800 transition-all focus:ring-8 focus:ring-indigo-50/50 outline-none"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-6">Password</label>
-            <input 
-              type="password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full bg-gray-50 border-2 border-transparent focus:border-indigo-100 rounded-[28px] p-5 text-sm font-bold text-gray-800 transition-all focus:ring-8 focus:ring-indigo-50/50 outline-none"
-            />
-          </div>
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-6 rounded-[28px] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-indigo-100 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 mt-4 group"
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-main)] overflow-hidden relative p-4">
+      
+      {/* BACKGROUND BACKDROP (Animated Feature Images) */}
+      <div className="absolute inset-0 z-0">
+        {FEATURES.map((feat, idx) => (
+          <div 
+            key={idx}
+            className={`absolute inset-0 transition-opacity duration-[2000ms] ease-in-out ${featureIndex === idx ? 'opacity-20 scale-100' : 'opacity-0 scale-110'}`}
           >
-            {loading ? 'Processing...' : (
-              <span className="flex items-center justify-center gap-2">
-                {mode === 'login' ? 'Start Listening' : 'Launch Account'}
-                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-              </span>
-            )}
-          </button>
-        </form>
-
-        <div className="relative mb-8">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-          <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-black"><span className="bg-white px-4 text-gray-300">Or continue with</span></div>
-        </div>
-
-        <button 
-          onClick={handleGoogleSignIn}
-          disabled={loading}
-          className="w-full bg-white border-2 border-gray-100 text-gray-700 py-5 rounded-[28px] font-black uppercase tracking-widest text-[10px] shadow-sm hover:border-indigo-100 hover:bg-gray-50 active:scale-[0.98] transition-all flex items-center justify-center gap-4 disabled:opacity-50"
-        >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-          Sign in with Google
-        </button>
-
-        <div className="mt-10 text-center">
-          <button 
-            onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-            className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] hover:text-indigo-800 transition-colors"
-          >
-            {mode === 'login' ? "New to VOICE SOCIAL? Create Profile" : "Existing Member? Authenticate"}
-          </button>
-        </div>
+            <img src={feat.image} className="w-full h-full object-cover brightness-[0.5]" alt="" />
+          </div>
+        ))}
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-main)]/40 via-transparent to-[var(--bg-main)]" />
       </div>
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center pointer-events-none">
-         <p className="text-[8px] font-black text-gray-300 uppercase tracking-[0.5em]">VOICE SOCIAL Security Architecture v2.0</p>
+      {/* THEME TOGGLE (Artistic placement) */}
+      <button 
+        onClick={toggleTheme}
+        className="fixed top-6 right-6 z-50 p-3 bg-[var(--bg-secondary)] border border-[var(--glass-border)] rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all text-[var(--accent)]"
+      >
+        {theme === 'midnight' ? (
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" /></svg>
+        ) : (
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+        )}
+      </button>
+
+      {/* AUTH CONTAINER (Foreground) */}
+      <div className="relative z-10 w-full max-w-[400px] animate-in fade-in zoom-in-95 duration-700">
+        
+        {/* Branding (Floating above card) */}
+        <div className="text-center mb-10">
+          <div className="w-16 h-16 bg-[var(--accent)] text-white rounded-2xl flex items-center justify-center mx-auto shadow-2xl mb-4">
+             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+          </div>
+          <h1 className="text-4xl font-black tracking-tighter text-[var(--accent)] uppercase italic">Chat-Chap</h1>
+          <p className="text-[var(--text-muted)] text-sm font-bold uppercase tracking-widest mt-1">Join the conversation</p>
+        </div>
+
+        <div className="bg-[var(--bg-secondary)] rounded-[24px] shadow-2xl p-8 border border-[var(--glass-border)]">
+          {mode === 'verify' ? (
+            <div className="text-center py-6">
+               <div className="w-16 h-16 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+               </div>
+               <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">Check your email</h3>
+               <p className="text-[var(--text-muted)] text-sm mb-8 leading-relaxed">We sent a verification link to your email address. Verify your account to sign in.</p>
+               <button 
+                 onClick={() => setMode('login')}
+                 className="w-full bg-[var(--accent)] text-white py-4 rounded-xl font-bold hover:bg-[var(--accent-hover)] transition-all active:scale-95"
+               >
+                 Back to Sign In
+               </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl text-xs font-bold animate-in shake duration-500">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleAuth} className="space-y-4">
+                {mode === 'register' && (
+                  <div className="space-y-4">
+                    <input 
+                      type="text" required value={displayName} onChange={e => setDisplayName(e.target.value)}
+                      placeholder="Full Name"
+                      className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all"
+                    />
+                    <input 
+                      type="text" required value={username} onChange={e => setUsername(e.target.value)}
+                      placeholder="Username (ID)"
+                      className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all"
+                    />
+                  </div>
+                )}
+
+                <input 
+                  type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="Email Address"
+                  className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all"
+                />
+
+                <input 
+                  type="password" required value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-xl px-4 py-4 text-[var(--text-main)] font-semibold outline-none focus:border-[var(--accent)] transition-all"
+                />
+
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-[var(--accent)] text-white py-4 rounded-xl font-black uppercase text-sm shadow-xl hover:bg-[var(--accent-hover)] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    mode === 'login' ? 'Sign In' : 'Create Account'
+                  )}
+                </button>
+              </form>
+
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-[var(--glass-border)]"></div>
+                <span className="flex-shrink mx-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">or</span>
+                <div className="flex-grow border-t border-[var(--glass-border)]"></div>
+              </div>
+
+              <button 
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="w-full bg-white text-slate-900 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow border border-slate-200 hover:bg-slate-50 transition-all active:scale-98 disabled:opacity-50"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                Sign in with Google
+              </button>
+
+              <div className="text-center pt-4">
+                 <button 
+                   onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                   className="text-sm font-bold text-[var(--accent)] hover:underline"
+                 >
+                   {mode === 'login' ? "New to Chat-Chap? Create account" : "Already have an account? Sign in"}
+                 </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <p className="mt-12 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest text-center opacity-40">
+          Powered by Voice Social Engine • v3.0 Mobile Focus
+        </p>
       </div>
     </div>
   );

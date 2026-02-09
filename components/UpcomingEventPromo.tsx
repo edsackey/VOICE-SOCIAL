@@ -1,39 +1,96 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MOCK_SCHEDULE } from '../constants';
-import { ScheduledEvent } from '../types';
+import { ScheduledEvent, MonetizedPromo } from '../types';
+import { StorageService } from '../services/storageService';
 
 interface UpcomingEventPromoProps {
   onViewEvent: (event: ScheduledEvent) => void;
+  onJoinPromo?: (promo: MonetizedPromo) => void;
 }
 
-const UpcomingEventPromo: React.FC<UpcomingEventPromoProps> = ({ onViewEvent }) => {
-  const nextEvent = MOCK_SCHEDULE[0]; // Promo for the first mock event
+const UpcomingEventPromo: React.FC<UpcomingEventPromoProps> = ({ onViewEvent, onJoinPromo }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [items, setItems] = useState<(ScheduledEvent | MonetizedPromo)[]>([]);
+  const [isPlayingTeaser, setIsPlayingTeaser] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const scheduled = [...MOCK_SCHEDULE];
+    const paidPromos = StorageService.getPromos();
+    setItems([...paidPromos, ...scheduled]);
+  }, []);
+
+  useEffect(() => {
+    if (items.length <= 1 || isPlayingTeaser) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % items.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [items, isPlayingTeaser]);
+
+  if (items.length === 0) return null;
+
+  const currentItem = items[activeIndex];
+  const isPaid = 'totalPaid' in currentItem;
 
   return (
-    <div className="mb-12 relative group cursor-pointer" onClick={() => onViewEvent(nextEvent)}>
-       <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-[56px] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
-       <div className="relative bg-white rounded-[50px] overflow-hidden shadow-2xl border border-white/50 flex flex-col md:flex-row">
-          <div className="w-full md:w-1/2 h-64 md:h-auto relative overflow-hidden">
-             <img src={nextEvent.posterUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[3000ms]" alt="" />
-             <div className="absolute top-6 left-6 bg-red-600 text-white px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl animate-pulse">Coming Soon</div>
+    <div className="relative h-[480px] rounded-[64px] overflow-hidden shadow-2xl border-4 border-white/5 bg-slate-900 group">
+      {/* Background Pipeline */}
+      <div className="absolute inset-0">
+        {items.map((item, idx) => (
+          <div 
+            key={item.id}
+            className={`absolute inset-0 transition-all duration-1000 ease-in-out ${activeIndex === idx ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-110 -rotate-2'}`}
+          >
+            <img 
+              src={(item as any).posterUrl || (item as any).imageUrl} 
+              className="w-full h-full object-cover brightness-[0.4] contrast-125" 
+              alt="" 
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-[#020617]/40" />
           </div>
-          <div className="flex-1 p-10 flex flex-col justify-center">
-             <div className="flex items-center gap-3 mb-6">
-                <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">Featured Event</div>
-                <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Starting Dec 14</span>
-             </div>
-             <h3 className="text-3xl font-black text-gray-900 tracking-tight leading-tight mb-4 group-hover:text-indigo-600 transition-colors">{nextEvent.title}</h3>
-             <p className="text-gray-500 font-medium mb-8 line-clamp-2">{nextEvent.description}</p>
-             <div className="flex items-center justify-between pt-6 border-t border-gray-50">
-                <div className="flex -space-x-3">
-                   {[1,2,3].map(i => <img key={i} src={`https://picsum.photos/seed/face${i}/100`} className="w-10 h-10 rounded-full border-4 border-white shadow-sm" alt="" />)}
-                   <div className="w-10 h-10 rounded-full bg-indigo-50 border-4 border-white flex items-center justify-center text-[10px] font-black text-indigo-600">+450</div>
-                </div>
-                <button className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] hover:underline">Secure Your Seat →</button>
-             </div>
+        ))}
+      </div>
+
+      <div className="relative z-10 h-full p-12 flex flex-col justify-end">
+        <div className="max-w-2xl animate-in slide-in-from-left-8 duration-700">
+          <div className="flex items-center gap-4 mb-6">
+            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl ${isPaid ? 'bg-orange-500 text-white' : 'bg-indigo-600 text-white'}`}>
+              {isPaid ? 'Featured Partner' : 'Trending Hub'}
+            </span>
+            <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">
+              Slide 0{activeIndex + 1}
+            </span>
           </div>
-       </div>
+
+          <h2 className="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-[0.85] mb-6 drop-shadow-2xl italic">
+            {currentItem.title}
+          </h2>
+          
+          <p className="text-lg text-slate-300 font-medium mb-10 line-clamp-2 max-w-xl opacity-80 leading-tight">
+            {currentItem.description}
+          </p>
+
+          <button 
+            onClick={() => isPaid ? onJoinPromo?.(currentItem as any) : onViewEvent(currentItem as any)}
+            className="bg-white text-indigo-950 px-12 py-6 rounded-[32px] font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:scale-105 active:scale-95 transition-all"
+          >
+            Enter the Stage →
+          </button>
+        </div>
+      </div>
+
+      {/* Modern Indicators */}
+      <div className="absolute right-12 bottom-12 flex flex-col gap-2 z-20">
+        {items.map((_, idx) => (
+          <button 
+            key={idx}
+            onClick={() => setActiveIndex(idx)}
+            className={`h-1.5 rounded-full transition-all duration-500 ${activeIndex === idx ? 'w-8 bg-white' : 'w-2 bg-white/20'}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

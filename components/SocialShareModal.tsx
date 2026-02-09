@@ -22,14 +22,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({ isOpen, onClose, ro
 
   const handleGeneratePoster = async () => {
     setIsGenerating(true);
-    const poster = await generateAdPoster(roomTitle, "Live Audio Discussion on Voice Room Live");
+    const poster = await generateAdPoster(roomTitle, "Live Audio Discussion on Chat-Chap");
     setAdImage(poster);
     setIsGenerating(false);
   };
 
   if (!isOpen) return null;
 
-  const shareText = `🎙️ I'm live in "${roomTitle}" on EchoHub! Join the conversation: ${roomUrl}`;
+  const shareText = `🎙️ I'm live in "${roomTitle}" on Chat-Chap! Join the conversation: ${roomUrl}`;
   const encodedText = encodeURIComponent(shareText);
   const encodedUrl = encodeURIComponent(roomUrl);
 
@@ -42,18 +42,18 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({ isOpen, onClose, ro
     try {
       const res = await fetch(adImage);
       const blob = await res.blob();
-      const file = new File([blob], 'voiceroomlive-room.png', { type: 'image/png' });
+      const file = new File([blob], 'chat-chap-room.png', { type: 'image/png' });
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `Join me on Voice Room Live!`,
+          title: `Join me on Chat-Chap!`,
           text: `We are talking about: ${roomTitle}`,
           url: roomUrl
         });
       } else if (navigator.share) {
         await navigator.share({
-          title: `Voice Room Live`,
+          title: `Chat-Chap`,
           text: shareText,
           url: roomUrl
         });
@@ -67,6 +67,29 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({ isOpen, onClose, ro
   };
 
   const platforms = [
+    { 
+      id: 'snapchat', 
+      name: 'Snapchat', 
+      icon: 'https://cdn-icons-png.flaticon.com/512/3670/3670161.png',
+      handler: handleShareNativeFile,
+      color: 'bg-[#FFFC00]',
+      textColor: 'text-black'
+    },
+    { 
+      id: 'tiktok', 
+      name: 'TikTok', 
+      icon: 'https://cdn-icons-png.flaticon.com/512/3046/3046121.png',
+      handler: handleShareNativeFile,
+      color: 'bg-black',
+      premium: true
+    },
+    { 
+      id: 'instagram', 
+      name: 'IG Stories', 
+      icon: 'https://cdn-icons-png.flaticon.com/512/2111/2111463.png',
+      handler: handleShareNativeFile,
+      color: 'bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]'
+    },
     { 
       id: 'whatsapp', 
       name: 'WhatsApp', 
@@ -87,21 +110,6 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({ isOpen, onClose, ro
       icon: 'https://cdn-icons-png.flaticon.com/512/5968/5968764.png',
       url: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
       color: 'bg-[#1877F2]'
-    },
-    { 
-      id: 'snapchat', 
-      name: 'Snapchat', 
-      icon: 'https://cdn-icons-png.flaticon.com/512/3670/3670162.png',
-      url: `https://www.snapchat.com/scan?attachmentUrl=${encodedUrl}`,
-      color: 'bg-[#FFFC00]',
-      textColor: 'text-black'
-    },
-    { 
-      id: 'instagram', 
-      name: 'IG Stories', 
-      icon: 'https://cdn-icons-png.flaticon.com/512/2111/2111463.png',
-      handler: handleShareNativeFile,
-      color: 'bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]'
     },
     { 
       id: 'native', 
@@ -128,12 +136,12 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({ isOpen, onClose, ro
   };
 
   return (
-    <div className="fixed inset-0 z-[350] bg-indigo-950/80 backdrop-blur-xl flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[350] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4" onClick={onClose}>
       <div 
         className="w-full max-w-2xl bg-[#f7f3e9] rounded-[60px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border border-white/20 flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
+        <div className="p-8 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
           <div>
             <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Social Outreach</h2>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Share this moment with the world</p>
@@ -159,7 +167,7 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({ isOpen, onClose, ro
                       onClick={() => {
                         const link = document.createElement('a');
                         link.href = adImage;
-                        link.download = 'echohub-live.png';
+                        link.download = 'chat-chap-room.png';
                         link.click();
                       }}
                       className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest"
@@ -185,11 +193,14 @@ const SocialShareModal: React.FC<SocialShareModalProps> = ({ isOpen, onClose, ro
                <button 
                 key={p.id}
                 onClick={() => handleAction(p)}
-                className={`${p.color} ${p.textColor || 'text-white'} p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 shadow-lg hover:scale-105 active:scale-95 transition-all relative overflow-hidden group`}
+                className={`${p.color} ${p.textColor || 'text-white'} p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 shadow-lg hover:scale-105 active:scale-95 transition-all relative overflow-hidden group ${p.premium ? 'ring-4 ring-cyan-400/30' : ''}`}
                >
                  <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                  <img src={p.icon} className="w-10 h-10 object-contain drop-shadow-md" alt={p.name} />
-                 <span className="text-[10px] font-black uppercase tracking-widest">{p.name}</span>
+                 <span className="text-[10px] font-black uppercase tracking-widest">
+                   {p.name}
+                   {p.premium && <span className="block text-[7px] opacity-50 mt-1">Hype Level: MAX</span>}
+                 </span>
                </button>
              ))}
           </div>

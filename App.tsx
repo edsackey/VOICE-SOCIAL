@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Room, User, UserRole, DBUser, ActiveCall, CallType } from './types';
+import { Room, User, UserRole, DBUser, ActiveCall, CallType, AppTheme, Locale, EchoNotification } from './types';
 import DiscoveryView from './components/DiscoveryView';
 import LiveRoom from './components/LiveRoom';
 import UserProfile from './components/UserProfile';
@@ -8,24 +8,28 @@ import ViralLaunchpad from './components/ViralLaunchpad';
 import PodcastArchive from './components/PodcastArchive';
 import AuthView from './components/AuthView';
 import FeedView from './components/FeedView';
-import MyFilesView from './components/MyFilesView';
 import ScheduleView from './components/ScheduleView';
 import GroupsView from './components/GroupsView';
 import PublicRoomPlayer from './components/PublicRoomPlayer';
 import CreatorStudio from './components/CreatorStudio';
 import CallsView from './components/CallsView';
 import CallOverlay from './components/CallOverlay';
+import LanguagePicker from './components/LanguagePicker';
+import VoiceAssistant from './components/VoiceAssistant';
+import NotificationsPanel from './components/NotificationsPanel';
+import NotificationToast from './components/NotificationToast';
 import { useLocale } from './components/LocaleContext';
 import { CURRENT_USER as MOCK_CURRENT_USER, MOCK_ROOMS } from './constants';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import { StorageService } from './services/storageService';
 
-const PROFILE_STORAGE_KEY = 'voiceroomlive_profile_data';
-const VOLUMES_STORAGE_KEY = 'voiceroomlive_local_volumes';
+const PROFILE_STORAGE_KEY = 'chat_chap_profile_data';
+const THEME_STORAGE_KEY = 'chat_chap_theme_pref';
+const THEMES: AppTheme[] = ['midnight', 'light', 'blue', 'sunset'];
 
 const App: React.FC = () => {
-  const { t } = useLocale();
+  const { locale } = useLocale();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
@@ -33,269 +37,252 @@ const App: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isLaunchpadOpen, setIsLaunchpadOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'rooms' | 'feed' | 'files' | 'schedule' | 'groups' | 'creator' | 'calls'>('rooms');
+  const [isLangPickerOpen, setIsLangPickerOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'rooms' | 'feed' | 'schedule' | 'groups' | 'creator' | 'calls'>('rooms');
   const [isPublicListenerMode, setIsPublicListenerMode] = useState(false);
   
+  const [notifications, setNotifications] = useState<EchoNotification[]>([]);
+  const [currentToast, setCurrentToast] = useState<EchoNotification | null>(null);
+
+  // Per-user volume state
+  const [userVolumes, setUserVolumes] = useState<Record<string, number>>({});
+
+  const [theme, setTheme] = useState<AppTheme>(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    return (saved as AppTheme) || 'midnight';
+  });
+
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const saved = localStorage.getItem(PROFILE_STORAGE_KEY);
     return saved ? JSON.parse(saved) : MOCK_CURRENT_USER;
   });
 
-  const [dbUser, setDbUser] = useState<DBUser | null>(null);
-  const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem(VOLUMES_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {};
-  });
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('public') === 'true') {
-      setIsPublicListenerMode(true);
-      setActiveRoom(MOCK_ROOMS[0]);
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && user.emailVerified) {
         setIsAuthenticated(true);
-        let storedDbUser = StorageService.getUser(user.uid);
-        if (!storedDbUser) {
-          storedDbUser = {
-            id: user.uid,
-            username: user.email?.split('@')[0] || `user_${Date.now()}`,
-            email: user.email || '',
-            createdAt: Date.now(),
-            displayName: currentUser.name !== 'John Doe' ? currentUser.name : (user.email?.split('@')[0] || 'New User'),
-            bio: currentUser.bio,
-            profilePictureUrl: currentUser.avatar
-          };
-          StorageService.saveUser(storedDbUser);
-        }
-        setDbUser(storedDbUser);
-
-        if (currentUser.name === 'John Doe') {
-          setCurrentUser(prev => ({ 
-            ...prev, 
-            id: user.uid,
-            name: storedDbUser!.displayName,
-            role: UserRole.HOST 
-          }));
-        }
       } else {
         setIsAuthenticated(false);
-        setDbUser(null);
       }
       setIsInitializing(false);
     });
     return () => unsubscribe();
   }, []);
 
+  const refreshNotifications = () => {
+    setNotifications(StorageService.getNotifications());
+  };
+
   useEffect(() => {
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(currentUser));
-    if (dbUser) {
-      StorageService.saveUser({
-        ...dbUser,
-        displayName: currentUser.name,
-        bio: currentUser.bio,
-        profilePictureUrl: currentUser.avatar
+    refreshNotifications();
+    
+    // Listen for custom real-time notification events
+    const handleNewNotif = (e: any) => {
+      const notif = e.detail;
+      setCurrentToast(notif);
+      refreshNotifications();
+    };
+    
+    window.addEventListener('echo_new_notification', handleNewNotif);
+    return () => window.removeEventListener('echo_new_notification', handleNewNotif);
+  }, []);
+
+  // Simulation: Occasionally trigger a "Follower started a room" notification
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const triggerSim = setTimeout(() => {
+      StorageService.saveNotification({
+        id: `sim-${Date.now()}`,
+        type: 'ROOM_START',
+        title: 'Sarah Chen is Live',
+        message: 'Join "Creative Coding with Gemini" starting now!',
+        timestamp: Date.now(),
+        isRead: false,
+        senderAvatar: 'https://picsum.photos/seed/u2/200'
       });
-    }
-  }, [currentUser, dbUser]);
+    }, 15000);
+    return () => clearTimeout(triggerSim);
+  }, [isAuthenticated]);
 
-  useEffect(() => {
-    localStorage.setItem(VOLUMES_STORAGE_KEY, JSON.stringify(userVolumes));
-  }, [userVolumes]);
-
-  const handleJoinRoom = (room: Room) => {
-    setActiveRoom(room);
-  };
-
-  const handleExitRoom = () => {
-    setActiveRoom(null);
-    if (isPublicListenerMode) {
-      setIsPublicListenerMode(false);
-      window.history.pushState({}, '', window.location.pathname);
-    }
-  };
-
-  const handleInitiateCall = (target: User, type: CallType) => {
-    setActiveCall({
-      id: `call-${Date.now()}`,
-      type,
-      participants: [currentUser, target],
-      startTime: Date.now()
-    });
-    setSelectedUser(null); // Close profile if open to show call overlay
-  };
-
-  const handleEndCall = () => {
-    setActiveCall(null);
-  };
-
-  const handleProfileUpdate = (data: Partial<User>) => {
-    setCurrentUser(prev => ({ ...prev, ...data }));
+  const toggleTheme = () => {
+    const nextIndex = (THEMES.indexOf(theme) + 1) % THEMES.length;
+    setTheme(THEMES[nextIndex]);
   };
 
   const handleVolumeChange = (userId: string, volume: number) => {
     setUserVolumes(prev => ({ ...prev, [userId]: volume }));
   };
 
-  const handleCreateRoom = (newRoom: Room) => {
-    const roomWithSelf = {
-      ...newRoom,
-      speakers: [{ ...currentUser, role: UserRole.HOST }]
-    };
-    handleJoinRoom(roomWithSelf);
+  const handleModerateUser = (userId: string, action: 'mute' | 'kick' | 'role', value?: any) => {
+    if (!activeRoom) return;
+
+    let updatedRoom = { ...activeRoom };
+
+    if (action === 'kick') {
+      updatedRoom.speakers = updatedRoom.speakers.filter(s => s.id !== userId);
+      updatedRoom.listeners = updatedRoom.listeners.filter(l => l.id !== userId);
+      if (selectedUser?.id === userId) setSelectedUser(null);
+      alert("Participant expelled from stage.");
+    } else if (action === 'mute') {
+      updatedRoom.speakers = updatedRoom.speakers.map(s => s.id === userId ? { ...s, isMuted: !s.isMuted } : s);
+      updatedRoom.listeners = updatedRoom.listeners.map(l => l.id === userId ? { ...l, isMuted: true } : l);
+      if (selectedUser?.id === userId) setSelectedUser(prev => prev ? { ...prev, isMuted: !prev.isMuted } : null);
+    } else if (action === 'role') {
+      const newRole = value as UserRole;
+      let targetUser = updatedRoom.speakers.find(s => s.id === userId) || updatedRoom.listeners.find(l => l.id === userId);
+      if (targetUser) {
+        targetUser = { ...targetUser, role: newRole };
+        updatedRoom.speakers = updatedRoom.speakers.filter(s => s.id !== userId);
+        updatedRoom.listeners = updatedRoom.listeners.filter(l => l.id !== userId);
+        if (newRole === UserRole.LISTENER) updatedRoom.listeners.push(targetUser);
+        else updatedRoom.speakers.push(targetUser);
+        if (selectedUser?.id === userId) setSelectedUser(targetUser);
+      }
+    }
+
+    setActiveRoom(updatedRoom);
   };
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-[#f7f3e9] flex flex-col items-center justify-center">
-        <div className="relative">
-          <div className="w-20 h-20 border-8 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-4 h-4 bg-indigo-600 rounded-full animate-pulse" />
-          </div>
-        </div>
-        <p className="mt-8 text-[10px] font-black text-indigo-600 uppercase tracking-[0.5em] animate-pulse">Initializing VOICE SOCIAL Global...</p>
+      <div className="min-h-screen bg-main flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-accent/20 border-t-accent rounded-full animate-spin mb-4" />
+        <p className="text-[10px] font-black text-accent uppercase tracking-[0.5em] animate-pulse">Chat-Chap Voice Engine</p>
       </div>
     );
   }
 
   if (isPublicListenerMode && activeRoom) {
-    return <PublicRoomPlayer room={activeRoom} onClose={handleExitRoom} />;
+    return <PublicRoomPlayer room={activeRoom} onClose={() => { setActiveRoom(null); setIsPublicListenerMode(false); }} />;
   }
 
-  if (!isAuthenticated) {
-    return <AuthView onAuthenticated={() => setIsAuthenticated(true)} />;
-  }
+  if (!isAuthenticated) return <AuthView onAuthenticated={() => setIsAuthenticated(true)} />;
 
   return (
-    <div className="min-h-screen bg-[#f7f3e9] flex flex-col">
-      {activeCall && (
-        <CallOverlay call={activeCall} onEndCall={handleEndCall} currentUser={currentUser} />
-      )}
+    <div className="min-h-screen bg-main text-main selection:bg-accent selection:text-white transition-colors duration-500">
+      <VoiceAssistant onNavigate={setActiveTab} onMuteToggle={() => {}} />
+      
+      <NotificationToast notification={currentToast} onClose={() => setCurrentToast(null)} />
+
+      {activeCall && <CallOverlay call={activeCall} onEndCall={() => setActiveCall(null)} currentUser={currentUser} />}
 
       {activeRoom ? (
         <LiveRoom 
           room={activeRoom} 
-          onExit={handleExitRoom} 
+          onExit={() => setActiveRoom(null)} 
           onUserClick={setSelectedUser}
           userVolumes={userVolumes}
           onVolumeChange={handleVolumeChange}
           currentUser={currentUser}
         />
       ) : (
-        <>
-          <nav className="bg-white/70 backdrop-blur-xl p-4 sticky top-0 z-30 border-b border-white/50 shadow-sm">
-             <div className="max-w-7xl mx-auto flex justify-between items-center">
-               <div className="flex items-center gap-3">
-                  <div className="bg-indigo-600 text-white p-2.5 rounded-2xl shadow-xl shadow-indigo-100">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                  </div>
-                  <span className="text-xl font-black text-gray-900 tracking-tighter uppercase">{t('app_name')}</span>
-               </div>
-               
-               <div className="hidden lg:flex bg-[#f7f3e9]/50 rounded-[20px] p-1 border border-gray-100">
-                 {[
-                   { id: 'rooms', label: t('rooms') },
-                   { id: 'calls', label: t('calls') },
-                   { id: 'schedule', label: t('schedule') },
-                   { id: 'groups', label: t('groups') },
-                   { id: 'feed', label: t('pulse') },
-                   { id: 'creator', label: t('creator_studio'), highlight: true },
-                 ].map((tab) => (
-                   <button 
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-indigo-600 shadow-md' : tab.highlight ? 'text-indigo-400 hover:text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                   >
-                     {tab.label} {tab.highlight && '💎'}
-                   </button>
-                 ))}
-               </div>
-
-               <div className="flex items-center gap-4">
-                 <button 
-                   onClick={() => setIsArchiveOpen(true)}
-                   className="p-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:scale-110 active:scale-95 transition-all text-gray-800"
-                   title="Vault"
-                 >
-                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                 </button>
-                 <div 
-                   className="relative cursor-pointer group"
-                   onClick={() => setSelectedUser(currentUser)}
-                 >
-                   <div className="w-11 h-11 rounded-[38%] overflow-hidden border-2 border-indigo-600 shadow-lg group-hover:scale-110 transition-transform">
-                      <img src={currentUser.avatar} className="w-full h-full object-cover" alt="Me" />
-                   </div>
-                   <div className="absolute -bottom-1 -right-1 bg-green-500 w-3.5 h-3.5 rounded-full border-4 border-white" />
-                 </div>
-               </div>
-             </div>
-          </nav>
-          
-          <main className="flex-1 max-w-7xl mx-auto w-full">
-            <div className="animate-in fade-in duration-700">
-              {activeTab === 'rooms' ? (
-                dbUser && <DiscoveryView onJoinRoom={handleJoinRoom} onCreateRoomClick={() => setIsLaunchpadOpen(true)} currentUser={dbUser} />
-              ) : activeTab === 'calls' ? (
-                <CallsView onJoinRoom={handleJoinRoom} onInitiateCall={handleInitiateCall} onUserClick={setSelectedUser} />
-              ) : activeTab === 'schedule' ? (
-                dbUser && <ScheduleView currentUser={dbUser} />
-              ) : activeTab === 'groups' ? (
-                dbUser && <GroupsView currentUser={dbUser} />
-              ) : activeTab === 'feed' ? (
-                dbUser && <FeedView currentUser={dbUser} />
-              ) : activeTab === 'creator' ? (
-                dbUser && <CreatorStudio currentUser={dbUser} />
-              ) : (
-                <MyFilesView />
-              )}
+        <div className="pb-32">
+          <nav className="p-6 sticky top-0 z-50 glass transition-all duration-300">
+            <div className="max-w-5xl mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-accent rounded-2xl flex items-center justify-center shadow-lg shadow-accent/20 rotate-3">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                </div>
+                <span className="text-xl font-black tracking-tighter uppercase italic">Chat-Chap</span>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsNotificationsOpen(true)}
+                  className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all relative"
+                >
+                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                   {unreadCount > 0 && (
+                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-black border-2 border-secondary shadow-lg animate-pulse">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                     </span>
+                   )}
+                </button>
+                <button 
+                  onClick={() => setIsLangPickerOpen(true)}
+                  className="px-4 py-2 bg-accent/10 rounded-2xl border border-accent/20 text-accent font-black text-[10px] uppercase tracking-widest hover:bg-accent hover:text-white transition-all hidden sm:block"
+                >
+                  Native: {locale.toUpperCase()}
+                </button>
+                <button 
+                  onClick={toggleTheme}
+                  className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all flex items-center gap-2"
+                  title="Switch Theme"
+                >
+                  {theme === 'midnight' && <span className="text-lg">🌙</span>}
+                  {theme === 'light' && <span className="text-lg">☀️</span>}
+                  {theme === 'blue' && <span className="text-lg">🌊</span>}
+                  {theme === 'sunset' && <span className="text-lg">🌅</span>}
+                </button>
+                <button onClick={() => setIsArchiveOpen(true)} className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
+                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                </button>
+                <div onClick={() => setSelectedUser(currentUser)} className="w-10 h-10 squircle overflow-hidden border-2 border-accent cursor-pointer hover:scale-110 transition-transform">
+                  <img src={currentUser.avatar} className="w-full h-full object-cover" alt="" />
+                </div>
+              </div>
             </div>
+          </nav>
+
+          <main className="max-w-5xl mx-auto px-6 pt-6 animate-in fade-in duration-500">
+            {activeTab === 'rooms' && <DiscoveryView onJoinRoom={setActiveRoom} onCreateRoomClick={() => setIsLaunchpadOpen(true)} currentUser={currentUser as any} />}
+            {activeTab === 'feed' && <FeedView currentUser={currentUser as any} />}
+            {activeTab === 'schedule' && <ScheduleView currentUser={currentUser as any} />}
+            {activeTab === 'calls' && <CallsView onJoinRoom={setActiveRoom} onInitiateCall={(u, t) => setActiveCall({id:'1', type:t, participants:[currentUser, u], startTime:Date.now()})} onUserClick={setSelectedUser} />}
+            {activeTab === 'groups' && <GroupsView currentUser={currentUser as any} />}
+            {activeTab === 'creator' && <CreatorStudio currentUser={currentUser as any} />}
           </main>
 
-          {/* Bottom Nav for Mobile */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-4 flex justify-between items-center z-40 shadow-[0_-8px_30px_rgba(0,0,0,0.05)]">
-             {['rooms', 'calls', 'creator', 'feed'].map(t_id => (
-               <button 
-                key={t_id}
-                onClick={() => setActiveTab(t_id as any)}
-                className={`p-3 rounded-2xl transition-all ${activeTab === t_id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400'}`}
-               >
-                  {t_id === 'rooms' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>}
-                  {t_id === 'calls' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>}
-                  {t_id === 'creator' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                  {t_id === 'feed' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L5 21V5a2 2 0 012-2h6a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3z" /></svg>}
-               </button>
-             ))}
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-6">
+            <div className="glass rounded-[32px] p-2 flex justify-between items-center border border-white/10 shadow-2xl transition-all duration-300">
+              {[
+                { id: 'rooms', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+                { id: 'calls', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
+                { id: 'creator', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { id: 'feed', icon: 'M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994_0 01-1.414-.586m0 0L5 21V5a2 2 0 012-2h6a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3z' }
+              ].map(tab => (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`p-4 rounded-2xl transition-all ${activeTab === tab.id ? 'bg-accent text-white shadow-xl shadow-accent/20' : 'text-muted hover:text-main'}`}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={tab.icon} /></svg>
+                </button>
+              ))}
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {selectedUser && (
         <UserProfile 
-          user={selectedUser.id === currentUser.id ? currentUser : selectedUser}
-          isOwnProfile={selectedUser.id === currentUser.id}
-          isOpen={!!selectedUser}
-          onClose={() => setSelectedUser(null)}
-          onUpdateProfile={handleProfileUpdate}
-          onInitiateCall={handleInitiateCall}
+          user={selectedUser} 
+          isOwnProfile={selectedUser.id === currentUser.id} 
+          isOpen={true} 
+          onClose={() => setSelectedUser(null)} 
+          viewerRole={currentUser.role}
           localVolume={userVolumes[selectedUser.id] ?? 1}
           onVolumeChange={handleVolumeChange}
-          viewerRole={currentUser.role}
+          onModerateUser={handleModerateUser}
         />
       )}
 
-      <ViralLaunchpad 
-        isOpen={isLaunchpadOpen}
-        onClose={() => setIsLaunchpadOpen(false)}
-        onLaunch={handleCreateRoom}
-      />
-
-      <PodcastArchive 
-        isOpen={isArchiveOpen}
-        onClose={() => setIsArchiveOpen(false)}
+      <ViralLaunchpad isOpen={isLaunchpadOpen} onClose={() => setIsLaunchpadOpen(false)} onLaunch={(r) => { setActiveRoom(r); setIsLaunchpadOpen(false); }} />
+      <PodcastArchive isOpen={isArchiveOpen} onClose={() => setIsArchiveOpen(false)} />
+      <LanguagePicker isOpen={isLangPickerOpen} onClose={() => setIsLangPickerOpen(false)} />
+      <NotificationsPanel 
+        isOpen={isNotificationsOpen} 
+        onClose={() => setIsNotificationsOpen(false)} 
+        notifications={notifications} 
+        onRefresh={refreshNotifications}
       />
     </div>
   );

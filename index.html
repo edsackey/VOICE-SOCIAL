@@ -3,23 +3,88 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VOICE SOCIAL | AI Social Audio & Media</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chat-Chap | Connect via Voice</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    :root {
+      /* Facebook Inspired Palette */
+      --bg-main: #F0F2F5;
+      --bg-secondary: #FFFFFF;
+      --accent: #1877F2;
+      --accent-hover: #166FE5;
+      --accent-glow: rgba(24, 119, 242, 0.2);
+      --text-main: #1C1E21;
+      --text-muted: #65676B;
+      --glass-bg: rgba(255, 255, 255, 0.8);
+      --glass-border: rgba(0, 0, 0, 0.1);
+      --nav-bg: rgba(255, 255, 255, 0.95);
+      
+      --sentiment-positive: #42B72A;
+      --sentiment-neutral: #1877F2;
+      --sentiment-intense: #F02849;
+      --sentiment-controversial: #F7B928;
+    }
+
+    [data-theme='midnight'] {
+      --bg-main: #18191A;
+      --bg-secondary: #242526;
+      --accent: #2D88FF;
+      --accent-hover: #3A92FF;
+      --accent-glow: rgba(45, 136, 255, 0.2);
+      --text-main: #E4E6EB;
+      --text-muted: #B0B3B8;
+      --glass-bg: rgba(36, 37, 38, 0.8);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --nav-bg: rgba(24, 25, 26, 0.95);
+    }
+
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #f7f3e9;
-      color: #1a1a1a;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 0.4s ease, color 0.4s ease;
     }
-    .custom-audio-player::-webkit-media-controls-panel {
-      background-color: transparent;
+
+    .premium-glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
     }
-    /* EasyWorship style projections transitions */
-    .animate-in {
-      animation-duration: 0.5s;
-      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+
+    .text-gradient {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .squircle {
+      border-radius: 20%;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+
+    @keyframes aurora {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .aurora-mesh {
+      background: linear-gradient(-45deg, #1877F2, #42B72A, #1877F2, #2D88FF);
+      background-size: 400% 400%;
+      animation: aurora 20s ease infinite;
+    }
+
+    [data-theme='midnight'] .aurora-mesh {
+      background: linear-gradient(-45deg, #18191A, #242526, #18191A, #2D88FF);
+      background-size: 400% 400%;
+      animation: aurora 20s ease infinite;
     }
   </style>
 <script type="importmap">

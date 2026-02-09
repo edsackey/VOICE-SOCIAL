@@ -1,7 +1,8 @@
 {
-  "name": "VOICE SOCIAL",
-  "description": "VOICE SOCIAL is a next-generation social audio platform featuring real-time AI transcription, smart moderation, and an interactive AI co-host powered by Google Gemini.",
+  "name": "Chat-Chap",
+  "description": "Chat-Chap is a premier social audio platform with a Facebook-inspired aesthetic, featuring real-time AI transcription and a bilingual AI co-host.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

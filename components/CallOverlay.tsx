@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { ActiveCall, User } from '../types';
+import { ActiveCall, User, CallRecord } from '../types';
+import { StorageService } from '../services/storageService';
 
 interface CallOverlayProps {
   call: ActiveCall;
@@ -24,6 +25,18 @@ const CallOverlay: React.FC<CallOverlayProps> = ({ call, onEndCall, currentUser 
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleEndCall = () => {
+    const record: CallRecord = {
+      id: `call-${Date.now()}`,
+      type: call.type,
+      participants: call.participants.map(p => ({ id: p.id, name: p.name, avatar: p.avatar })),
+      startTime: call.startTime,
+      duration: duration
+    };
+    StorageService.saveCallRecord(record);
+    onEndCall();
   };
 
   const remoteUser = call.participants.find(p => p.id !== currentUser.id) || call.participants[0];
@@ -123,7 +136,7 @@ const CallOverlay: React.FC<CallOverlayProps> = ({ call, onEndCall, currentUser 
             </button>
 
             <button 
-              onClick={onEndCall}
+              onClick={handleEndCall}
               className="p-10 bg-red-600 text-white rounded-[32px] shadow-[0_20px_50px_rgba(220,38,38,0.5)] hover:bg-red-700 hover:scale-105 active:scale-95 transition-all"
             >
                <svg className="w-10 h-10 rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" /></svg>
