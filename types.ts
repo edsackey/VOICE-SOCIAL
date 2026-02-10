@@ -20,6 +20,8 @@ export type AppTheme = 'midnight' | 'light' | 'blue' | 'sunset';
 
 export type CallType = 'voice' | 'video';
 
+export type RecurrenceType = 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
 export type MediaType = 'scripture' | 'lyric' | 'slide' | 'screenshare' | 'banner' | 'advert' | 'music_info' | 'none';
 
 export interface DBUser {
@@ -34,6 +36,21 @@ export interface DBUser {
   preferredLocale?: Locale;
   nativeLanguage?: Locale;
   preferredCurrency?: string;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+}
+
+export interface Poll {
+  id: string;
+  question: string;
+  options: PollOption[];
+  totalVotes: number;
+  isActive: boolean;
+  creatorId: string;
 }
 
 export interface Room {
@@ -52,6 +69,7 @@ export interface Room {
   startTime?: number;
   posterUrl?: string;
   activeTranslationLang?: Locale;
+  activePoll?: Poll;
 }
 
 export interface User {
@@ -189,6 +207,11 @@ export interface ScheduledEvent {
   capacity: number;
   bookedCount: number;
   posterUrl?: string;
+  recurrence?: RecurrenceType;
+  recurringDays?: number[];
+  isPrivate?: boolean;
+  price?: number;
+  currency?: string;
 }
 
 export type NotificationType = 'ROOM_START' | 'EVENT_NEW' | 'DIRECT_MESSAGE' | 'FOLLOW' | 'SYSTEM';

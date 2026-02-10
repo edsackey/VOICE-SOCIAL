@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Chat-Chap | Your Voice, Echoed Globally</title>
+  <title>EchoHub | Your Voice, Echoed Globally</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       /* Chat-Chap Premium Palette */
@@ -28,30 +28,36 @@
     }
 
     [data-theme='midnight'] {
-      --bg-main: #18191A;
-      --bg-secondary: #242526;
+      --bg-main: #0B0B0C;
+      --bg-secondary: #141415;
       --accent: #2D88FF;
       --accent-hover: #3A92FF;
       --accent-glow: rgba(45, 136, 255, 0.2);
-      --text-main: #E4E6EB;
-      --text-muted: #B0B3B8;
-      --glass-bg: rgba(36, 37, 38, 0.8);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --nav-bg: rgba(24, 25, 26, 0.95);
+      --text-main: #F8F9FA;
+      --text-muted: #A0A0A5;
+      --glass-bg: rgba(20, 20, 21, 0.85);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --nav-bg: rgba(11, 11, 12, 0.95);
     }
 
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       background-color: var(--bg-main);
       color: var(--text-main);
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
       transition: background-color 0.4s ease, color 0.4s ease;
+      letter-spacing: -0.01em;
+    }
+
+    h1, h2, h3, h4, .font-black {
+      font-family: 'Space Grotesk', sans-serif !important;
+      letter-spacing: -0.03em;
     }
 
     .premium-glass {
       background: var(--glass-bg);
-      backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(32px) saturate(180%);
       border: 1px solid var(--glass-border);
     }
 
@@ -62,10 +68,10 @@
     }
 
     .squircle {
-      border-radius: 20%;
+      border-radius: 24%;
     }
 
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
 
@@ -76,15 +82,20 @@
     }
 
     .aurora-mesh {
-      background: linear-gradient(-45deg, #1877F2, #42B72A, #1877F2, #2D88FF);
+      background: linear-gradient(-45deg, #1877F2, #42B72A, #2D88FF, #1877F2);
       background-size: 400% 400%;
-      animation: aurora 20s ease infinite;
+      animation: aurora 15s ease-in-out infinite;
     }
 
     [data-theme='midnight'] .aurora-mesh {
-      background: linear-gradient(-45deg, #18191A, #242526, #18191A, #2D88FF);
+      background: linear-gradient(-45deg, #1A1A1B, #242526, #0B0B0C, #2D88FF);
       background-size: 400% 400%;
-      animation: aurora 20s ease infinite;
+      animation: aurora 15s ease-in-out infinite;
+    }
+
+    /* Snappy Animations */
+    .snap-transition {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
   </style>
 <script type="importmap">

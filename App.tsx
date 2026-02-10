@@ -5,6 +5,8 @@ import DiscoveryView from './components/DiscoveryView';
 import LiveRoom from './components/LiveRoom';
 import UserProfile from './components/UserProfile';
 import ViralLaunchpad from './components/ViralLaunchpad';
+import AddRoomWizard from './components/AddRoomWizard';
+import AdvancedSchedulePanel from './components/AdvancedSchedulePanel';
 import PodcastArchive from './components/PodcastArchive';
 import AuthView from './components/AuthView';
 import FeedView from './components/FeedView';
@@ -35,7 +37,9 @@ const App: React.FC = () => {
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isAddRoomWizardOpen, setIsAddRoomWizardOpen] = useState(false);
   const [isLaunchpadOpen, setIsLaunchpadOpen] = useState(false);
+  const [isAdvancedScheduleOpen, setIsAdvancedScheduleOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isLangPickerOpen, setIsLangPickerOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -101,12 +105,33 @@ const App: React.FC = () => {
   const handleModerateUser = (userId: string, action: 'mute' | 'kick' | 'role', value?: any) => {
     if (!activeRoom) return;
     let updatedRoom = { ...activeRoom };
+    
     if (action === 'kick') {
       updatedRoom.speakers = updatedRoom.speakers.filter(s => s.id !== userId);
       updatedRoom.listeners = updatedRoom.listeners.filter(l => l.id !== userId);
       if (selectedUser?.id === userId) setSelectedUser(null);
     } else if (action === 'mute') {
       updatedRoom.speakers = updatedRoom.speakers.map(s => s.id === userId ? { ...s, isMuted: !s.isMuted } : s);
+    } else if (action === 'role') {
+      const targetRole = value as UserRole;
+      let targetUser = activeRoom.speakers.find(s => s.id === userId) || activeRoom.listeners.find(l => l.id === userId);
+      
+      if (targetUser) {
+        const updatedUser = { ...targetUser, role: targetRole };
+        
+        // Remove from both
+        updatedRoom.speakers = updatedRoom.speakers.filter(s => s.id !== userId);
+        updatedRoom.listeners = updatedRoom.listeners.filter(l => l.id !== userId);
+        
+        // Add to correct array
+        if (targetRole === UserRole.LISTENER) {
+          updatedRoom.listeners.push(updatedUser);
+        } else {
+          updatedRoom.speakers.push(updatedUser);
+        }
+        
+        if (selectedUser?.id === userId) setSelectedUser(updatedUser);
+      }
     }
     setActiveRoom(updatedRoom);
   };
@@ -130,7 +155,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-main text-main selection:bg-accent selection:text-white transition-colors duration-500">
-      <VoiceAssistant onNavigate={setActiveTab} onMuteToggle={() => {}} onOpenCreationPortal={() => setIsLaunchpadOpen(true)} />
+      <VoiceAssistant onNavigate={setActiveTab} onMuteToggle={() => {}} onOpenCreationPortal={() => setIsAddRoomWizardOpen(true)} />
       <NotificationToast notification={currentToast} onClose={() => setCurrentToast(null)} />
 
       {activeCall && <CallOverlay call={activeCall} onEndCall={() => setActiveCall(null)} currentUser={currentUser} />}
@@ -143,6 +168,7 @@ const App: React.FC = () => {
           userVolumes={userVolumes}
           onVolumeChange={handleVolumeChange}
           currentUser={currentUser}
+          onUpdateRoom={setActiveRoom}
         />
       ) : (
         <div className="pb-32">
@@ -177,12 +203,12 @@ const App: React.FC = () => {
           </nav>
 
           <main className="max-w-5xl mx-auto px-6 pt-6 animate-in fade-in duration-500">
-            {activeTab === 'rooms' && <DiscoveryView onJoinRoom={setActiveRoom} onCreateRoomClick={() => setIsLaunchpadOpen(true)} currentUser={currentUser as any} />}
+            {activeTab === 'rooms' && <DiscoveryView onJoinRoom={setActiveRoom} onCreateRoomClick={() => setIsAddRoomWizardOpen(true)} currentUser={currentUser as any} />}
             {activeTab === 'feed' && <FeedView currentUser={currentUser as any} />}
             {activeTab === 'schedule' && <ScheduleView currentUser={currentUser as any} />}
             {activeTab === 'calls' && <CallsView onJoinRoom={setActiveRoom} onInitiateCall={(u, t) => setActiveCall({id:'1', type:t, participants:[currentUser, u], startTime:Date.now()})} onUserClick={setSelectedUser} />}
             {activeTab === 'groups' && <GroupsView currentUser={currentUser as any} />}
-            {activeTab === 'creator' && <CreatorStudio currentUser={currentUser as any} onLaunchHub={() => setIsLaunchpadOpen(true)} />}
+            {activeTab === 'creator' && <CreatorStudio currentUser={currentUser as any} onLaunchHub={() => setIsAddRoomWizardOpen(true)} />}
           </main>
 
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-6">
@@ -218,6 +244,22 @@ const App: React.FC = () => {
           onModerateUser={handleModerateUser}
         />
       )}
+
+      <AddRoomWizard 
+        isOpen={isAddRoomWizardOpen}
+        onClose={() => setIsAddRoomWizardOpen(false)}
+        currentUser={currentUser}
+        onLaunch={(r) => { setActiveRoom(r); setIsAddRoomWizardOpen(false); }}
+        onOpenViralLaunchpad={() => setIsLaunchpadOpen(true)}
+        onOpenAdvancedSchedule={() => setIsAdvancedScheduleOpen(true)}
+      />
+
+      <AdvancedSchedulePanel
+        isOpen={isAdvancedScheduleOpen}
+        onClose={() => setIsAdvancedScheduleOpen(false)}
+        currentUser={currentUser}
+        onScheduled={(e) => { setIsAdvancedScheduleOpen(false); setActiveTab('schedule'); }}
+      />
 
       <ViralLaunchpad 
         isOpen={isLaunchpadOpen} 

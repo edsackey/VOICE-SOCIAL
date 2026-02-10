@@ -1,7 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MOCK_ROOMS } from '../constants';
 import { Room, ScheduledEvent, DBUser } from '../types';
+import { StorageService } from '../services/storageService';
 import UpcomingEventPromo from './UpcomingEventPromo';
 import BookingModal from './BookingModal';
 import RoomRecordingsModal from './RoomRecordingsModal';
@@ -17,27 +18,113 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
   const [searchQuery, setSearchQuery] = useState('');
   const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'neutral'>('all');
   const [selectedBookingEvent, setSelectedBookingEvent] = useState<ScheduledEvent | null>(null);
-  const [recordingsRoom, setRecordingsRoom] = useState<string | null>(null);
+  const [recordingsRoom, setRecordingsRoom] = useState<Room | null>(null);
   const [isBuyPromoOpen, setIsBuyPromoOpen] = useState(false);
+  
+  const [firebaseRooms, setFirebaseRooms] = useState<Room[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredRooms = useMemo(() => {
-    return MOCK_ROOMS.filter(r => {
+  useEffect(() => {
+    const unsubscribe = StorageService.subscribeToLiveRooms((rooms) => {
+      setFirebaseRooms(rooms);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const { liveRooms, pastRooms } = useMemo(() => {
+    const combined = [...firebaseRooms, ...MOCK_ROOMS.filter(mr => !firebaseRooms.some(fr => fr.id === mr.id))];
+
+    const filtered = combined.filter(r => {
       const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
         r.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesSentiment = sentimentFilter === 'all' || r.sentiment === sentimentFilter;
       return matchesSearch && matchesSentiment;
     });
-  }, [searchQuery, sentimentFilter]);
+
+    return {
+      liveRooms: filtered.filter(r => r.isLive),
+      pastRooms: filtered.filter(r => !r.isLive && r.participantCount > 0)
+    };
+  }, [firebaseRooms, searchQuery, sentimentFilter]);
+
+  const renderRoomCard = (room: Room) => {
+    const totalFollowers = (room.followerCount || 0) + room.speakers.reduce((acc, s) => acc + (StorageService.getFollowers(s.id).length), 0);
+    
+    return (
+      <div 
+        key={room.id}
+        onClick={() => room.isLive ? onJoinRoom(room) : setRecordingsRoom(room)}
+        className="group relative h-[420px] bg-[var(--bg-secondary)] rounded-[40px] overflow-hidden cursor-pointer transition-all duration-500 hover:shadow-2xl border border-[var(--glass-border)] hover:-translate-y-1"
+      >
+        <img 
+          src={room.posterUrl || `https://picsum.photos/seed/${room.id}/800/800`} 
+          className="absolute inset-0 w-full h-full object-cover transition-all duration-[2000ms] group-hover:scale-110 brightness-[0.6] group-hover:brightness-[0.4]" 
+          alt="" 
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+        
+        <div className="relative h-full p-8 flex flex-col justify-end">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {room.isLive ? (
+              <div className="bg-red-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest animate-pulse shadow-lg">
+                LIVE
+              </div>
+            ) : (
+              <div className="bg-white/20 text-white backdrop-blur-md px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-white/20">
+                ARCHIVED
+              </div>
+            )}
+            <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-white/20 bg-white/10 text-white backdrop-blur-md">
+              {room.participantCount} PULSING
+            </div>
+            <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-white/20 bg-[var(--accent)]/40 text-white backdrop-blur-md flex items-center gap-1.5">
+              <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
+              {totalFollowers.toLocaleString()} REACH
+            </div>
+          </div>
+
+          <h3 className="text-2xl font-black text-white leading-tight mb-2 group-hover:text-[var(--accent)] transition-colors duration-300 uppercase italic">
+            {room.title}
+          </h3>
+          
+          <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-3">
+                {room.speakers.slice(0, 3).map(s => (
+                  <div key={s.id} className="relative">
+                    <img src={s.avatar} className="w-10 h-10 rounded-2xl border-2 border-slate-900 shadow-xl object-cover" alt="" />
+                    {StorageService.getFollowers(s.id).length > 50 && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border border-white flex items-center justify-center">
+                        <div className="w-1 h-1 bg-white rounded-full" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="w-12 h-12 rounded-[18px] bg-[var(--accent)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all shadow-xl shadow-accent/20">
+              {room.isLive ? (
+                <svg className="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-10 pb-24 max-w-5xl mx-auto">
+    <div className="space-y-12 pb-24 max-w-5xl mx-auto">
       {/* Dynamic Header */}
       <div className="space-y-6">
         <div className="relative group">
           <input 
             type="text" 
             placeholder="Search Chat-Chap Stages..." 
-            className="w-full bg-[var(--bg-secondary)] border border-[var(--glass-border)] rounded-full py-4 pl-14 pr-6 text-sm font-semibold placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all outline-none text-[var(--text-main)] shadow-sm"
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--glass-border)] rounded-[24px] py-4 pl-14 pr-6 text-sm font-semibold placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all outline-none text-[var(--text-main)] shadow-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -48,20 +135,28 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
           </div>
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-2">
-          {['all', 'positive', 'neutral'].map((v) => (
-            <button
-              key={v}
-              onClick={() => setSentimentFilter(v as any)}
-              className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all border shrink-0 ${
-                sentimentFilter === v 
-                ? 'bg-[var(--accent)] border-[var(--accent)] text-white shadow-md' 
-                : 'bg-[var(--bg-secondary)] border-[var(--glass-border)] text-[var(--text-muted)] hover:bg-[var(--bg-main)]'
-              }`}
-            >
-              {v === 'all' ? 'All' : v === 'positive' ? 'Trending' : 'Chill'}
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-2">
+            {['all', 'positive', 'neutral'].map((v) => (
+              <button
+                key={v}
+                onClick={() => setSentimentFilter(v as any)}
+                className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all border shrink-0 ${
+                  sentimentFilter === v 
+                  ? 'bg-[var(--accent)] border-[var(--accent)] text-white shadow-md' 
+                  : 'bg-[var(--bg-secondary)] border-[var(--glass-border)] text-[var(--text-muted)] hover:bg-[var(--bg-main)]'
+                }`}
+              >
+                {v === 'all' ? 'All' : v === 'positive' ? 'Trending' : 'Chill'}
+              </button>
+            ))}
+          </div>
+          {isLoading && (
+            <div className="flex items-center gap-2">
+               <div className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+               <span className="text-[8px] font-black text-accent uppercase tracking-widest">Syncing Hub</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -74,89 +169,54 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
         </div>
       )}
 
-      {/* Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="col-span-full flex justify-between items-end mb-2">
+      {/* Live Section */}
+      <section className="space-y-6">
+        <div className="flex justify-between items-end">
            <div>
-             <h2 className="text-2xl font-black tracking-tight text-[var(--text-main)] uppercase italic">Global Pulse</h2>
-             <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Live audio architecture</p>
+             <h2 className="text-2xl font-black tracking-tight text-[var(--text-main)] uppercase italic">Live Pulse</h2>
+             <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Active Stages currently broadcasting</p>
            </div>
            <button 
              onClick={() => setIsBuyPromoOpen(true)}
-             className="px-4 py-2 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-all"
+             className="px-4 py-2 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-all shadow-sm"
            >
-             Promote
+             Promote Stage
            </button>
         </div>
 
-        {filteredRooms.length === 0 ? (
-          <div className="col-span-full py-20 text-center bg-[var(--bg-secondary)] rounded-[24px] border border-dashed border-[var(--glass-border)]">
-             <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-widest">No active stages match your vibe</p>
+        {liveRooms.length === 0 && !isLoading ? (
+          <div className="py-24 text-center bg-[var(--bg-secondary)] rounded-[40px] border border-dashed border-[var(--glass-border)] opacity-60">
+             <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-widest">The airwaves are clear. Try launching a room.</p>
           </div>
         ) : (
-          filteredRooms.map(room => (
-            <div 
-              key={room.id}
-              onClick={() => room.isLive && onJoinRoom(room)}
-              className="group relative h-[420px] bg-[var(--bg-secondary)] rounded-[24px] overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl border border-[var(--glass-border)]"
-            >
-              <img 
-                src={room.posterUrl || `https://picsum.photos/seed/${room.id}/800/800`} 
-                className="absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-105 brightness-[0.6] group-hover:brightness-[0.4]" 
-                alt="" 
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-              
-              <div className="relative h-full p-8 flex flex-col justify-end">
-                <div className="flex flex-wrap items-center gap-2 mb-4">
-                  {room.isLive && (
-                    <div className="bg-red-600 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest animate-pulse">
-                      LIVE
-                    </div>
-                  )}
-                  <div className="px-3 py-1 rounded-md text-[9px] font-black uppercase border border-white/20 bg-white/10 text-white/90 backdrop-blur-md">
-                    {room.participantCount} PULSING
-                  </div>
-                  <div className="px-3 py-1 rounded-md text-[9px] font-black uppercase border border-white/20 bg-[var(--accent)]/40 text-white backdrop-blur-md flex items-center gap-1.5">
-                    <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
-                    {room.followerCount.toLocaleString()} FOLLOWERS
-                  </div>
-                </div>
-
-                <h3 className="text-2xl font-black text-white leading-tight mb-2 group-hover:text-[var(--accent)] transition-colors duration-300 uppercase italic">
-                  {room.title}
-                </h3>
-                
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="flex -space-x-2">
-                      {room.speakers.slice(0, 3).map(s => (
-                        <img key={s.id} src={s.avatar} className="w-8 h-8 rounded-full border-2 border-[var(--bg-secondary)] shadow-sm" alt="" />
-                      ))}
-                    </div>
-                    {room.followerCount > 100 && (
-                      <span className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Verified Tribe</span>
-                    )}
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg">
-                    <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {liveRooms.map(renderRoomCard)}
+          </div>
         )}
-      </div>
+      </section>
+
+      {/* Past Section */}
+      {pastRooms.length > 0 && (
+        <section className="space-y-6 pt-10 border-t border-[var(--glass-border)]">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-[var(--text-muted)] uppercase italic">Past Echoes</h2>
+            <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Recently concluded discussions</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-80 hover:opacity-100 transition-opacity">
+            {pastRooms.map(renderRoomCard)}
+          </div>
+        </section>
+      )}
 
       <button 
         onClick={onCreateRoomClick}
-        className="fixed bottom-24 right-10 z-[110] w-16 h-16 bg-[var(--accent)] text-white rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center"
+        className="fixed bottom-28 right-10 z-[110] w-16 h-16 bg-[var(--accent)] text-white rounded-full shadow-[0_24px_48px_rgba(24,119,242,0.3)] hover:scale-110 active:scale-95 transition-all flex items-center justify-center border-4 border-[var(--bg-main)]"
       >
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
       </button>
 
       {selectedBookingEvent && <BookingModal isOpen={true} onClose={() => setSelectedBookingEvent(null)} event={selectedBookingEvent} currentUser={currentUser as any} />}
-      {recordingsRoom && <RoomRecordingsModal isOpen={true} onClose={() => setRecordingsRoom(null)} roomTitle={recordingsRoom} />}
+      {recordingsRoom && <RoomRecordingsModal isOpen={true} onClose={() => setRecordingsRoom(null)} roomTitle={recordingsRoom.title} roomId={recordingsRoom.id} />}
       <BuyPromoModal isOpen={isBuyPromoOpen} onClose={() => setIsBuyPromoOpen(false)} currentUser={currentUser as any} onSuccess={() => {}} />
     </div>
   );

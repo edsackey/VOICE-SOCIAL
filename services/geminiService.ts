@@ -4,7 +4,7 @@ import { GoogleGenAI, Type, Modality, FunctionDeclaration, GenerateContentRespon
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * Tools for Abena AI co-host to drive app interactivity.
+ * Tools for Assistant AI to drive app interactivity.
  */
 export const appControlTools: FunctionDeclaration[] = [
   {
@@ -15,7 +15,7 @@ export const appControlTools: FunctionDeclaration[] = [
       properties: {
         tab: { 
           type: Type.STRING, 
-          description: 'The target tab ID. Options: "rooms" (Discovery), "feed" (The Pulse), "schedule" (Timeline), "groups" (Tribes), "creator" (Creator Hub), "calls" (Connect).' 
+          description: 'The target tab ID. Options: "rooms", "feed", "schedule", "groups", "creator", "calls".' 
         },
       },
       required: ['tab'],
@@ -36,7 +36,7 @@ export const appControlTools: FunctionDeclaration[] = [
 ];
 
 /**
- * Transcribes audio using Gemini 3 Flash for speed and accuracy.
+ * Transcribes audio using Gemini 3 Flash.
  */
 export const transcribeAudio = async (base64Audio: string): Promise<string> => {
   try {
@@ -45,7 +45,7 @@ export const transcribeAudio = async (base64Audio: string): Promise<string> => {
       contents: {
         parts: [
           { inlineData: { mimeType: 'audio/wav', data: base64Audio } },
-          { text: "Transcribe this audio strictly verbatim. Do not summarize." },
+          { text: "Transcribe this audio strictly verbatim." },
         ],
       },
     });
@@ -57,86 +57,25 @@ export const transcribeAudio = async (base64Audio: string): Promise<string> => {
 };
 
 /**
- * Real-time translation logic using Gemini Native Audio.
- */
-export const translateAudioStream = async (base64Audio: string, targetLang: string, voice: string = 'Puck'): Promise<{ text: string, audio: string }> => {
-  try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-      contents: {
-        parts: [
-          { inlineData: { mimeType: 'audio/pcm;rate=16000', data: base64Audio } },
-          { text: `Transcribe audio and translate into ${targetLang}. Return JSON format with "transcription" and "translation" fields.` }
-        ],
-      },
-      config: { responseMimeType: 'application/json' }
-    });
-    
-    const data = JSON.parse(response.text || '{}');
-    
-    const ttsResponse: GenerateContentResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: data.translation }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
-      }
-    });
-
-    return {
-      text: data.translation,
-      audio: ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || ''
-    };
-  } catch (error) {
-    console.error("Translation Stream Error:", error);
-    throw error;
-  }
-};
-
-/**
- * Previews an AI voice using Gemini TTS.
- */
-export const previewVoice = async (voiceName: string, text: string = "Welcome to Chat-Chap! I am Abena, your AI co-host."): Promise<string> => {
-  try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: voiceName
-            }
-          }
-        }
-      }
-    });
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
-  } catch (error) {
-    console.error("Voice Preview Error:", error);
-    return "";
-  }
-};
-
-/**
- * Summarizes the stage session into structured minutes using Gemini 3 Flash.
+ * Summarizes the stage session into structured minutes.
  */
 export const generateMeetingMinutes = async (title: string, transcriptions: string[]): Promise<string> => {
   try {
+    if (transcriptions.length === 0) return "No conversation data was captured during this session.";
+    
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Synthesize professional meeting minutes for: "${title}". Transcript: ${transcriptions.join('\n')}. Include Key Takeaways and Action Items.`,
+      contents: `Title: "${title}". Transcript: ${transcriptions.join('\n')}. Synthesize a professional summary with key takeaways.`,
     });
-    return response.text || "Summary unavailable.";
+    return response.text || "Summary analysis complete but returned empty.";
   } catch (error) {
     console.error("Minutes Error:", error);
-    return "Error generating minutes.";
+    return "The AI was unable to synthesize minutes for this session due to a technical error.";
   }
 };
 
 /**
- * Generates catchy room identity using Gemini 3 Flash.
+ * Generates catchy room identity.
  */
 export const generateRoomIdeas = async (baseTopic: string): Promise<any> => {
   const response: GenerateContentResponse = await ai.models.generateContent({
@@ -166,7 +105,7 @@ export const generateSlideContent = async (topic: string, transcriptions: string
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Analyze room topic "${topic}" and transcript "${transcriptions.slice(-10).join('\n')}". Generate visual slide data.`,
+      contents: `Analyze room topic "${topic}" and generate a visual slide content.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -182,13 +121,12 @@ export const generateSlideContent = async (topic: string, transcriptions: string
     });
     return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Slide Content Error:", error);
-    return { title: topic, content: "Continuing...", imagePrompt: topic };
+    return { title: topic, content: "Continuing the discussion...", imagePrompt: topic };
   }
 };
 
 /**
- * Crafts viral marketing copy for external distribution.
+ * Crafts viral marketing copy.
  */
 export const generatePromoContent = async (data: { title: string, description: string }): Promise<any> => {
   try {
@@ -211,13 +149,96 @@ export const generatePromoContent = async (data: { title: string, description: s
     });
     return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Promo Content Error:", error);
     return { twitter: "", instagram: "", whatsapp: "", linkedin: "" };
   }
 };
 
 /**
- * Optimizes a scheduled event's details.
+ * Generates a promotional image for a room.
+ */
+export const generateAdPoster = async (title: string, description: string): Promise<string | null> => {
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          { text: `A professional, cinematic promotional poster for a social audio room about "${title}". ${description}. Sleek typography, minimalist style.` }
+        ]
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "16:9"
+        }
+      }
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Poster Generation Error:", error);
+    return null;
+  }
+};
+
+/**
+ * Generates a voice teaser audio clip.
+ * FIX: Simplified prompt to avoid 500 errors from complex TTS instructions.
+ */
+export const generateVoiceTeaser = async (title: string, description: string): Promise<string | null> => {
+  try {
+    // Simplify spoken text to avoid internal synthesis errors
+    const spokenText = `Hello! Join us live right now on Chat Chap to discuss ${title.substring(0, 50)}. It is going to be an amazing conversation!`;
+    
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: spokenText }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, // Kore is often more stable for longer strings
+          },
+        },
+      },
+    });
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+  } catch (error) {
+    console.error("Voice Teaser Error:", error);
+    return null;
+  }
+};
+
+// Fix: Added missing previewVoice function for testing voices
+/**
+ * Previews an AI voice by generating a short clip.
+ */
+export const previewVoice = async (voiceName: string): Promise<string | null> => {
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: 'This is a preview of the Chat-Chap neural voice layer.' }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName },
+          },
+        },
+      },
+    });
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+  } catch (error) {
+    console.error("Voice Preview Error:", error);
+    return null;
+  }
+};
+
+/**
+ * Refines schedule details.
  */
 export const optimizeScheduleDetails = async (title: string, description: string): Promise<any> => {
   try {
@@ -239,66 +260,6 @@ export const optimizeScheduleDetails = async (title: string, description: string
     });
     return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Schedule Optimization Error:", error);
     return { title, description, tags: [] };
-  }
-};
-
-// Fix for missing member generateAdPoster
-/**
- * Generates a promotional image for a room using Gemini 2.5 Flash Image.
- */
-export const generateAdPoster = async (title: string, description: string): Promise<string | null> => {
-  try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [
-          { text: `Create a cinematic, professional promotional poster for a social audio room. Title: "${title}". Context: "${description}". The style should be modern, sleek, and high-tech.` }
-        ]
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "16:9"
-        }
-      }
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        const base64EncodeString: string = part.inlineData.data;
-        return `data:${part.inlineData.mimeType};base64,${base64EncodeString}`;
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error("Poster Generation Error:", error);
-    return null;
-  }
-};
-
-// Fix for missing member generateVoiceTeaser
-/**
- * Generates a voice teaser audio clip using Gemini 2.5 Flash TTS.
- */
-export const generateVoiceTeaser = async (title: string, description: string): Promise<string | null> => {
-  try {
-    const prompt = `Create a short, high-energy 10-second audio teaser for a social audio room titled "${title}". Use an enthusiastic tone. Description: ${description}. The voice should invite people to join now.`;
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Puck' },
-          },
-        },
-      },
-    });
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
-  } catch (error) {
-    console.error("Voice Teaser Error:", error);
-    return null;
   }
 };
