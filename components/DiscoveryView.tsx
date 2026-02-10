@@ -44,12 +44,20 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
 
     return {
       liveRooms: filtered.filter(r => r.isLive),
-      pastRooms: filtered.filter(r => !r.isLive && r.participantCount > 0)
+      pastRooms: filtered.filter(r => !r.isLive)
     };
   }, [firebaseRooms, searchQuery, sentimentFilter]);
 
+  const handleDeleteRoom = async (e: React.MouseEvent, roomId: string) => {
+    e.stopPropagation();
+    if (window.confirm("Permanently purge this stage from the Hub history?")) {
+      await StorageService.deleteRoomFirebase(roomId);
+    }
+  };
+
   const renderRoomCard = (room: Room) => {
-    const totalFollowers = (room.followerCount || 0) + room.speakers.reduce((acc, s) => acc + (StorageService.getFollowers(s.id).length), 0);
+    const totalReach = (room.followerCount || 0) + room.speakers.reduce((acc, s) => acc + (StorageService.getFollowers(s.id).length), 0);
+    const isMock = room.id.startsWith('room-');
     
     return (
       <div 
@@ -80,7 +88,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
             </div>
             <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-white/20 bg-[var(--accent)]/40 text-white backdrop-blur-md flex items-center gap-1.5">
               <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
-              {totalFollowers.toLocaleString()} REACH
+              {totalReach.toLocaleString()} REACH
             </div>
           </div>
 
@@ -94,21 +102,27 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
                 {room.speakers.slice(0, 3).map(s => (
                   <div key={s.id} className="relative">
                     <img src={s.avatar} className="w-10 h-10 rounded-2xl border-2 border-slate-900 shadow-xl object-cover" alt="" />
-                    {StorageService.getFollowers(s.id).length > 50 && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border border-white flex items-center justify-center">
-                        <div className="w-1 h-1 bg-white rounded-full" />
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             </div>
-            <div className="w-12 h-12 rounded-[18px] bg-[var(--accent)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all shadow-xl shadow-accent/20">
-              {room.isLive ? (
-                <svg className="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-              ) : (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            
+            <div className="flex items-center gap-2 translate-y-2 group-hover:translate-y-0 transition-all opacity-0 group-hover:opacity-100">
+              {!isMock && (
+                <button 
+                  onClick={(e) => handleDeleteRoom(e, room.id)}
+                  className="w-10 h-10 rounded-xl bg-red-600/20 text-red-500 border border-red-500/30 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all"
+                >
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
               )}
+              <div className="w-12 h-12 rounded-[18px] bg-[var(--accent)] text-white flex items-center justify-center shadow-xl shadow-accent/20">
+                {room.isLive ? (
+                  <svg className="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -200,9 +214,9 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onJoinRoom, onCreateRoomC
         <section className="space-y-6 pt-10 border-t border-[var(--glass-border)]">
           <div>
             <h2 className="text-2xl font-black tracking-tight text-[var(--text-muted)] uppercase italic">Past Echoes</h2>
-            <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Recently concluded discussions</p>
+            <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Global stage history • Persisted until deletion</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-80 hover:opacity-100 transition-opacity">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {pastRooms.map(renderRoomCard)}
           </div>
         </section>

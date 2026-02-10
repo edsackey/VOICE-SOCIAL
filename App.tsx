@@ -66,17 +66,33 @@ const App: React.FC = () => {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
+  // Session Restoration Logic
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user && user.emailVerified) {
         setIsAuthenticated(true);
+        // Attempt to restore active room
+        const savedRoomId = StorageService.getActiveRoomId();
+        if (savedRoomId && !activeRoom) {
+           const room = await StorageService.getRoom(savedRoomId);
+           if (room && room.isLive) {
+             setActiveRoom(room);
+           } else {
+             StorageService.setActiveRoomId(null);
+           }
+        }
       } else {
         setIsAuthenticated(false);
       }
       setIsInitializing(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [activeRoom]);
+
+  // Track active room in storage
+  useEffect(() => {
+    StorageService.setActiveRoomId(activeRoom?.id || null);
+  }, [activeRoom]);
 
   const refreshNotifications = () => {
     setNotifications(StorageService.getNotifications());
@@ -118,22 +134,15 @@ const App: React.FC = () => {
       
       if (targetUser) {
         const updatedUser = { ...targetUser, role: targetRole };
-        
-        // Remove from both
         updatedRoom.speakers = updatedRoom.speakers.filter(s => s.id !== userId);
         updatedRoom.listeners = updatedRoom.listeners.filter(l => l.id !== userId);
-        
-        // Add to correct array
-        if (targetRole === UserRole.LISTENER) {
-          updatedRoom.listeners.push(updatedUser);
-        } else {
-          updatedRoom.speakers.push(updatedUser);
-        }
-        
+        if (targetRole === UserRole.LISTENER) updatedRoom.listeners.push(updatedUser);
+        else updatedRoom.speakers.push(updatedUser);
         if (selectedUser?.id === userId) setSelectedUser(updatedUser);
       }
     }
     setActiveRoom(updatedRoom);
+    StorageService.updateRoomFirebase(activeRoom.id, updatedRoom);
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;

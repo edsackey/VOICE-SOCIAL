@@ -3,6 +3,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MediaState, MediaType, BackgroundAudio, PlaylistTrack, PodcastRecord } from '../types';
 import { generateSlideContent } from '../services/geminiService';
 import { BIBLE_BOOKS } from '../constants/books';
+import { StorageService } from '../services/storageService';
+import { auth, storage } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-storage.js";
 
 interface MediaConsoleProps {
   isOpen: boolean;
@@ -24,12 +27,6 @@ interface UploadedFile {
   url: string;
 }
 
-const QUICK_VERSES = [
-  { category: 'Worship', text: 'Sing to the Lord a new song; sing to the Lord, all the earth.', ref: 'Psalm 96:1' },
-  { category: 'Strength', text: 'I can do all things through Christ who strengthens me.', ref: 'Philippians 4:13' },
-  { category: 'Peace', text: 'The Lord is my shepherd; I shall not want.', ref: 'Psalm 23:1' },
-];
-
 const MediaConsole: React.FC<MediaConsoleProps> = ({ 
   isOpen, 
   onClose, 
@@ -44,6 +41,7 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
 }) => {
   const [activeApp, setActiveApp] = useState<'hub' | 'present' | 'scripture' | 'ads'>('hub');
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Persistent Background / Atmosphere State (Pad)
   const [bgSound, setBgSound] = useState<BackgroundAudio | null>(() => {
@@ -104,47 +102,91 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
     }
   }, [isMusicPlaying, musicVolume, activeTrackId, isMusicLooping]);
 
+  // Fetch persistent library on open
   useEffect(() => {
-    if (!isOpen) setIsMinimized(false);
+    if (isOpen && auth.currentUser) {
+      StorageService.getMediaLibrary(auth.currentUser.uid).then(onUpdateAudioTracks);
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    const newBg: BackgroundAudio = { id: 'custom-pad', name: file.name, url: url, isPlaying: false, volume: bgVolume, loop: true };
-    setBgSound(newBg);
-    localStorage.setItem('eh_custom_bg_sound', JSON.stringify(newBg));
-    setIsBgPlaying(true);
+    const user = auth.currentUser;
+    if (!file || !user) return;
+    
+    setIsUploading(true);
+    try {
+      const sRef = ref(storage, `media/${user.uid}/bg_${Date.now()}`);
+      await uploadBytes(sRef, file);
+      const url = await getDownloadURL(sRef);
+      const newBg: BackgroundAudio = { id: 'custom-pad', name: file.name, url: url, isPlaying: false, volume: bgVolume, loop: true };
+      setBgSound(newBg);
+      localStorage.setItem('eh_custom_bg_sound', JSON.stringify(newBg));
+      setIsBgPlaying(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMusicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
-    const filesArray = Array.from(files) as File[];
-    const newTracks: PlaylistTrack[] = filesArray.slice(0, 3 - audioTracks.length).map(f => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: f.name,
-      url: URL.createObjectURL(f),
-      size: f.size,
-      type: f.type
-    }));
-    onUpdateAudioTracks([...audioTracks, ...newTracks]);
+    const user = auth.currentUser;
+    if (!files || !user) return;
+
+    setIsUploading(true);
+    try {
+      const filesArray = Array.from(files) as File[];
+      for (const f of filesArray) {
+        const sRef = ref(storage, `media/${user.uid}/track_${Date.now()}_${f.name}`);
+        await uploadBytes(sRef, f);
+        const url = await getDownloadURL(sRef);
+        const track: PlaylistTrack = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: f.name,
+          url: url,
+          size: f.size,
+          type: f.type
+        };
+        await StorageService.saveMediaToLibrary(user.uid, track);
+      }
+      const library = await StorageService.getMediaLibrary(user.uid);
+      onUpdateAudioTracks(library);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const handlePresentationUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePresentationUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
-    const filesArray = Array.from(files) as File[];
-    const newFiles: UploadedFile[] = filesArray.map(f => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: f.name,
-      type: f.name.toLowerCase().endsWith('.ppt') || f.name.toLowerCase().endsWith('.pptx') ? 'ppt' : 'image',
-      url: URL.createObjectURL(f)
-    }));
-    setUploadedFiles(prev => [...prev, ...newFiles]);
+    const user = auth.currentUser;
+    if (!files || !user) return;
+
+    setIsUploading(true);
+    try {
+      const filesArray = Array.from(files) as File[];
+      for (const f of filesArray) {
+        const sRef = ref(storage, `media/${user.uid}/visual_${Date.now()}_${f.name}`);
+        await uploadBytes(sRef, f);
+        const url = await getDownloadURL(sRef);
+        const newFile: UploadedFile = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: f.name,
+          type: f.name.toLowerCase().endsWith('.ppt') || f.name.toLowerCase().endsWith('.pptx') ? 'ppt' : 'image',
+          url: url
+        };
+        setUploadedFiles(prev => [...prev, newFile]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const toggleMusicTrack = (id: string) => {
@@ -218,8 +260,8 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
                 <div>
                   <h2 className="text-2xl font-black text-main uppercase tracking-tight italic">Host Stage Console</h2>
                   <div className="flex items-center gap-3">
-                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                     <p className="text-[10px] text-muted font-bold uppercase tracking-[0.4em]">Unified Control Cluster • Session Active</p>
+                     <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isUploading ? 'bg-orange-500' : 'bg-green-500'}`} />
+                     <p className="text-[10px] text-muted font-bold uppercase tracking-[0.4em]">{isUploading ? 'HUB SYNCHRONIZING...' : 'Unified Control Cluster • Session Active'}</p>
                   </div>
                 </div>
               </div>
@@ -309,10 +351,8 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
                       {/* Tracks & Playlist Hub */}
                       <div className="space-y-6">
                          <div className="flex justify-between items-center px-4">
-                            <h4 className="text-[11px] font-black text-muted uppercase tracking-widest">Your Tracks ({audioTracks.length}/3)</h4>
-                            {audioTracks.length < 3 && (
-                               <button onClick={() => musicFileInputRef.current?.click()} className="text-[10px] font-black text-accent uppercase tracking-widest hover:underline">+ Add Hub Media</button>
-                            )}
+                            <h4 className="text-[11px] font-black text-muted uppercase tracking-widest">Your Tracks ({audioTracks.length})</h4>
+                            <button onClick={() => musicFileInputRef.current?.click()} className="text-[10px] font-black text-accent uppercase tracking-widest hover:underline">+ Add Hub Media</button>
                             <input type="file" ref={musicFileInputRef} className="hidden" accept="audio/*" multiple onChange={handleMusicUpload} />
                          </div>
                          <div className="space-y-3">
@@ -338,9 +378,9 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
                        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-[80px] -mr-40 -mt-40" />
                        <div className="max-w-xl relative z-10 text-center md:text-left">
                           <h3 className="text-5xl font-black uppercase tracking-tighter italic mb-4">Visual Hub</h3>
-                          <p className="text-xl text-indigo-100 font-medium leading-relaxed opacity-90 italic">Broadcasting your PowerPoint slides and visuals directly to the Hub stage projector.</p>
+                          <p className="text-xl text-indigo-100 font-medium leading-relaxed opacity-90 italic">Broadcasting your persistent slides and visuals directly to the Hub stage projector.</p>
                        </div>
-                       <button onClick={() => presentationFileInputRef.current?.click()} className="bg-white text-indigo-600 px-16 py-8 rounded-[40px] font-black uppercase tracking-[0.3em] text-sm shadow-2xl shadow-black/20 hover:scale-105 active:scale-95 transition-all relative z-10 shrink-0">Upload PPT / Slides</button>
+                       <button onClick={() => presentationFileInputRef.current?.click()} className="bg-white text-indigo-600 px-16 py-8 rounded-[40px] font-black uppercase tracking-[0.3em] text-sm shadow-2xl shadow-black/20 hover:scale-105 active:scale-95 transition-all relative z-10 shrink-0">Upload Assets</button>
                        <input type="file" ref={presentationFileInputRef} className="hidden" accept="image/*, .ppt, .pptx" multiple onChange={handlePresentationUpload} />
                     </div>
 

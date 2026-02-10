@@ -1,5 +1,5 @@
 
-import { DBUser, DBPost, DBFollow, DBLike, DBComment, DBSubscription, DBDonation, AttendanceRecord, EchoGroup, ScheduledEvent, MonetizedPromo, PodcastRecord, EchoNotification, CallRecord, Room } from '../types';
+import { DBUser, DBPost, DBFollow, DBLike, DBComment, DBSubscription, DBDonation, AttendanceRecord, EchoGroup, ScheduledEvent, MonetizedPromo, PodcastRecord, EchoNotification, CallRecord, Room, PlaylistTrack } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -32,7 +32,8 @@ const KEYS = {
   PODCASTS: 'voiceroomlive_podcasts',
   NOTIFICATIONS: 'chat_chap_notifications',
   CALL_HISTORY: 'chat_chap_call_history',
-  ROOM_FOLLOWS: 'chat_chap_room_follows'
+  ROOM_FOLLOWS: 'chat_chap_room_follows',
+  ACTIVE_ROOM_ID: 'chat_chap_active_room_id'
 };
 
 const getLocal = <T>(key: string): T[] => {
@@ -52,15 +53,26 @@ const setLocal = <T>(key: string, data: T[]) => {
 };
 
 export const StorageService = {
+  // --- SESSION MANAGEMENT ---
+  setActiveRoomId: (id: string | null) => {
+    if (id) localStorage.setItem(KEYS.ACTIVE_ROOM_ID, id);
+    else localStorage.removeItem(KEYS.ACTIVE_ROOM_ID);
+  },
+  getActiveRoomId: () => localStorage.getItem(KEYS.ACTIVE_ROOM_ID),
+
   // --- FIREBASE ROOMS (Real Backend) ---
   subscribeToLiveRooms: (callback: (rooms: Room[]) => void) => {
-    // Listen for all rooms created in the session, not just live ones, 
-    // to allow the UI to handle the transition state.
-    const q = query(collection(db, "rooms"), orderBy("createdAt", "desc"), limit(20));
+    // Increased limit to show more history
+    const q = query(collection(db, "rooms"), orderBy("createdAt", "desc"), limit(50));
     return onSnapshot(q, (snapshot) => {
       const rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Room));
       callback(rooms);
     });
+  },
+
+  getRoom: async (roomId: string): Promise<Room | null> => {
+    const roomDoc = await getDoc(doc(db, "rooms", roomId));
+    return roomDoc.exists() ? { id: roomDoc.id, ...roomDoc.data() } as Room : null;
   },
 
   createRoomFirebase: async (roomData: Omit<Room, 'id'>): Promise<string> => {
@@ -92,6 +104,28 @@ export const StorageService = {
     } catch (error) {
       console.error("Firebase Room Close Failed:", error);
     }
+  },
+
+  deleteRoomFirebase: async (roomId: string) => {
+    try {
+      await deleteDoc(doc(db, "rooms", roomId));
+    } catch (error) {
+      console.error("Firebase Room Deletion Failed:", error);
+    }
+  },
+
+  // --- MEDIA LIBRARY (SURVIVES REFRESH) ---
+  saveMediaToLibrary: async (userId: string, track: PlaylistTrack) => {
+    await addDoc(collection(db, `users/${userId}/library`), {
+      ...track,
+      addedAt: Date.now()
+    });
+  },
+
+  getMediaLibrary: async (userId: string): Promise<PlaylistTrack[]> => {
+    const q = query(collection(db, `users/${userId}/library`), orderBy("addedAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlaylistTrack));
   },
 
   // --- PODCASTS / RECORDINGS (Local + Persistence Support) ---
