@@ -53,6 +53,15 @@ export interface Poll {
   creatorId: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface Room {
   id: string;
   title: string;
@@ -70,6 +79,15 @@ export interface Room {
   posterUrl?: string;
   activeTranslationLang?: Locale;
   activePoll?: Poll;
+  activeMedia?: MediaState;
+  activeAudio?: {
+    url: string;
+    name: string;
+    isPlaying: boolean;
+    startTime: number;
+    volume: number;
+    type: 'music' | 'atmosphere';
+  };
 }
 
 export interface User {

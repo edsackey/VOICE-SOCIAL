@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MediaState, MediaType, BackgroundAudio, PlaylistTrack, PodcastRecord } from '../types';
+import { MediaState, MediaType, BackgroundAudio, PlaylistTrack, PodcastRecord, Room } from '../types';
 import { generateSlideContent } from '../services/geminiService';
 import { BIBLE_BOOKS } from '../constants/books';
 import { StorageService } from '../services/storageService';
@@ -11,6 +11,7 @@ interface MediaConsoleProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdateMedia: (media: MediaState) => void;
+  onUpdateAudio: (audio: Room['activeAudio']) => void;
   roomTopic: string;
   roomPoster?: string;
   transcriptionHistory: string[];
@@ -31,6 +32,7 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
   isOpen, 
   onClose, 
   onUpdateMedia, 
+  onUpdateAudio,
   roomTopic, 
   roomPoster,
   transcriptionHistory,
@@ -77,27 +79,48 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
   const musicFileInputRef = useRef<HTMLInputElement>(null);
   const presentationFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync atmosphere audio
+  // Sync atmosphere audio (Local & Global)
   useEffect(() => {
     if (bgAudioRef.current) {
       bgAudioRef.current.volume = bgVolume;
       if (isBgPlaying && bgSound) {
         bgAudioRef.current.play().catch(() => {});
+        onUpdateAudio({
+          url: bgSound.url,
+          name: bgSound.name,
+          isPlaying: true,
+          startTime: Date.now(),
+          volume: bgVolume,
+          type: 'atmosphere'
+        });
       } else {
         bgAudioRef.current.pause();
+        if (bgSound) onUpdateAudio(undefined);
       }
     }
   }, [isBgPlaying, bgVolume, bgSound]);
 
-  // Sync music audio
+  // Sync music audio (Local & Global)
   useEffect(() => {
     if (musicAudioRef.current) {
       musicAudioRef.current.volume = musicVolume;
       musicAudioRef.current.loop = isMusicLooping;
       if (isMusicPlaying && activeTrackId) {
-        musicAudioRef.current.play().catch(() => {});
+        const track = audioTracks.find(t => t.id === activeTrackId);
+        if (track) {
+          musicAudioRef.current.play().catch(() => {});
+          onUpdateAudio({
+            url: track.url,
+            name: track.name,
+            isPlaying: true,
+            startTime: Date.now(),
+            volume: musicVolume,
+            type: 'music'
+          });
+        }
       } else {
         musicAudioRef.current.pause();
+        if (activeTrackId) onUpdateAudio(undefined);
       }
     }
   }, [isMusicPlaying, musicVolume, activeTrackId, isMusicLooping]);
@@ -419,7 +442,7 @@ const MediaConsole: React.FC<MediaConsoleProps> = ({
                           <h4 className="text-[11px] font-black text-muted uppercase tracking-widest italic px-4">Neural Studio</h4>
                           <div className="bg-secondary p-10 rounded-[48px] border border-white/5 space-y-10 shadow-xl">
                              <div className="space-y-4">
-                                <div className="flex items-center gap-4"><div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-white">✨</div><p className="text-[11px] font-black text-indigo-300 uppercase tracking-widest">AI Hub Assistant</p></div>
+                                <div className="flex items-center gap-4"><div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-white">✨</div><p className="text-[11px] font-black text-indigo-300 uppercase tracking-widest">AI Hub Assistant</p></div>
                                 <button onClick={handleAiSparkSlide} disabled={isGeneratingAiSlide} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:scale-105 transition-all disabled:opacity-50">
                                    {isGeneratingAiSlide ? 'Analyzing Session...' : 'Spark Global Slide'}
                                 </button>

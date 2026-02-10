@@ -1,5 +1,5 @@
 
-import { DBUser, DBPost, DBFollow, DBLike, DBComment, DBSubscription, DBDonation, AttendanceRecord, EchoGroup, ScheduledEvent, MonetizedPromo, PodcastRecord, EchoNotification, CallRecord, Room, PlaylistTrack } from '../types';
+import { DBUser, DBPost, DBFollow, DBLike, DBComment, DBSubscription, DBDonation, AttendanceRecord, EchoGroup, ScheduledEvent, MonetizedPromo, PodcastRecord, EchoNotification, CallRecord, Room, PlaylistTrack, ChatMessage } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -62,7 +62,6 @@ export const StorageService = {
 
   // --- FIREBASE ROOMS (Real Backend) ---
   subscribeToLiveRooms: (callback: (rooms: Room[]) => void) => {
-    // Increased limit to show more history
     const q = query(collection(db, "rooms"), orderBy("createdAt", "desc"), limit(50));
     return onSnapshot(q, (snapshot) => {
       const rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Room));
@@ -114,6 +113,27 @@ export const StorageService = {
     }
   },
 
+  // --- CHAT SYSTEM (SYNCED) ---
+  subscribeToRoomChat: (roomId: string, callback: (messages: ChatMessage[]) => void) => {
+    const q = query(
+      collection(db, `rooms/${roomId}/messages`), 
+      orderBy("timestamp", "asc"),
+      limit(200)
+    );
+    return onSnapshot(q, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
+      callback(messages);
+    });
+  },
+
+  sendChatMessage: async (roomId: string, message: Omit<ChatMessage, 'id'>) => {
+    try {
+      await addDoc(collection(db, `rooms/${roomId}/messages`), message);
+    } catch (error) {
+      console.error("Chat send failed", error);
+    }
+  },
+
   // --- MEDIA LIBRARY (SURVIVES REFRESH) ---
   saveMediaToLibrary: async (userId: string, track: PlaylistTrack) => {
     await addDoc(collection(db, `users/${userId}/library`), {
@@ -128,7 +148,7 @@ export const StorageService = {
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlaylistTrack));
   },
 
-  // --- PODCASTS / RECORDINGS (Local + Persistence Support) ---
+  // --- PODCASTS / RECORDINGS ---
   getPodcasts: (roomId?: string) => {
     const all = getLocal<PodcastRecord>(KEYS.PODCASTS);
     return roomId ? all.filter(p => p.roomId === roomId) : all;
